@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <title>ELBUS Voice Notes</title>
+</head>
+
+<body>
+
+    <h1>ELBUS Voice Notes</h1>
+
+    <p>Record a voice note using your microphone.</p>
+    <button id="recordButton">Start recording</button>
+    <button id="stopButton" disabled>Stop recording</button>
+    <p id="status">Ready.</p>
+
+    <audio id="audioPlayer" controls hidden></audio>
+
+    <br>
+
+    <button id="transcribeButton" disabled>Transcribe recording</button>
+
+    <h2>Transcript</h2>
+
+    <textarea
+        id="transcript"
+        rows="6"
+        cols="60"
+        placeholder="The transcription will appear here..."></textarea>
+
+    <label for="experimentId">
+        Experiment ID:
+    </label>
+
+    <br><br>
+
+    <input id="experimentId" type="number" min="1" placeholder="e.g. 123">
+
+    <br><br>
+
+    <button id="sendButton" disabled>Add transcript to ELBUS</button>
+
+    <script src="/static/app.js"></script>
+
+</body>
+
+</html>
