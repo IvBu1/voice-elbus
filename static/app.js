@@ -34,8 +34,6 @@ recordButton.addEventListener("click", async function (){
 
         mediaRecorder.addEventListener("stop", function (){
             latestAudioBlob = new Blob(audioChunks, {type: mediaRecorder.mimeType});
-            // const audioUrl = URL.createObjectURL(latestAudioBlob);
-            // audioPlayer.src = audioUrl; // assign blob to audio player for playing
 
             if (latestAudioUrl !== null) {
                 URL.revokeObjectURL(latestAudioUrl);
@@ -106,7 +104,7 @@ async function transcribeRecording() {
     transcribeButton.disabled = true;
 
     try {
-        const response = await fetch("/transcribe", {method: "POST", body: formData});
+        const response = await fetch("transcribe", {method: "POST", body: formData});
 
         if (!response.ok) {
             const errorResult = await response.json();
@@ -137,14 +135,7 @@ async function sendToElbus(){
         return;
     }
 
-    // const experimentId = Number(experimentIdInput.value);
     const text = transcript.value.trim();
-
-
-    // if (!experimentId){
-    //     status.textContent = "Please enter a valid experiment ID.";
-    //     return;
-    // }
 
     if (!text){
         status.textContent = "The transcript is empty.";
@@ -164,7 +155,7 @@ async function sendToElbus(){
     sendButton.disabled = true;
 
     try {
-        const response = await fetch("/append", {
+        const response = await fetch("append", {
                 method: "POST", 
                 headers: {"Content-Type": "application/json"}, 
                 body: JSON.stringify({experiment_id: verifiedExperimentId, text: text})
@@ -212,7 +203,7 @@ async function checkExperiment(){
     checkExperimentButton.disabled = true;
 
     try{
-        const response = await fetch("/experiment/" + experimentId);
+        const response = await fetch("experiment/" + experimentId);
 
         if (!response.ok){
             const errorResult = await response.json();
