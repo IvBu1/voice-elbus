@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from elbus import append_voice_note
+from elbus import append_voice_note, get_experiment_title
 from transcription import transcribe_audio
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -65,7 +65,21 @@ def create_app():
             raise HTTPException(status_code=500, detail=(f"ELBUS request failed: {exc}"))
         return {"ok": True}
 
+
+    @app.get("/experiment/{experiment_id}")
+    def experiment_info(experiment_id: int):
+        try:
+            title = get_experiment_title(experiment_id)
+
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=(f"Could not read experiment: {exc}"))
+
+        return {"experiment_id": experiment_id, "title": title}
+
+
     return app
+
+
 
 
 class AppendRequest(BaseModel):

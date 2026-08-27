@@ -36,6 +36,17 @@ def append_voice_note(experiment_id: int,
 	)
 	response.raise_for_status()
 
+def get_experiment_title(experiment_id: int) -> str:
+	url = f"{BASE_URL}/experiments/{experiment_id}"
+
+	response = requests.get(
+		url, 
+		headers=headers
+	)
+	response.raise_for_status()
+	experiment = response.json()
+	title_and_name = f"{experiment["title"]} by {experiment["fullname"]}"
+	return title_and_name
 
 
 

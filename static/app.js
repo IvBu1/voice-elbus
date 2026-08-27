@@ -7,51 +7,62 @@ const transcribeButton = document.getElementById("transcribeButton");
 const transcript = document.getElementById("transcript");
 
 const experimentIdInput = document.getElementById("experimentId");
+const checkExperimentButton = document.getElementById("checkExperimentButton");
+const experimentInfo = document.getElementById("experimentInfo");
 const sendButton = document.getElementById("sendButton");
 
 let mediaRecorder;
 let audioStream;
 let audioChunks = [];
 let latestAudioBlob = null;
+let latestAudioUrl = null;
+let verifiedExperimentId = null;
+let verifiedExperimentTitle = null;
 
 recordButton.addEventListener("click", async function (){
-        try {
-            audioStream = await navigator.mediaDevices.getUserMedia({audio: true});
-            mediaRecorder = new MediaRecorder(audioStream);
+    try {
+        audioStream = await navigator.mediaDevices.getUserMedia({audio: true});
+        mediaRecorder = new MediaRecorder(audioStream);
 
-            audioChunks = [];
+        audioChunks = [];
 
-            mediaRecorder.addEventListener("dataavailable", function (event){
-                    audioChunks.push(event.data);
-                }
-            );
-
-
-            mediaRecorder.addEventListener("stop", function (){
-                latestAudioBlob = new Blob(audioChunks, {type: mediaRecorder.mimeType});
-                const audioUrl = URL.createObjectURL(latestAudioBlob);
-                audioPlayer.src = audioUrl; // assign blob to audio player for playing
-                audioPlayer.hidden = false;
-                transcribeButton.disabled = false;
-                status.textContent = "Recording ready.";
-                }
-            );
+        mediaRecorder.addEventListener("dataavailable", function (event){
+                audioChunks.push(event.data);
+            }
+        );
 
 
+        mediaRecorder.addEventListener("stop", function (){
+            latestAudioBlob = new Blob(audioChunks, {type: mediaRecorder.mimeType});
+            // const audioUrl = URL.createObjectURL(latestAudioBlob);
+            // audioPlayer.src = audioUrl; // assign blob to audio player for playing
 
-            mediaRecorder.start();
+            if (latestAudioUrl !== null) {
+                URL.revokeObjectURL(latestAudioUrl);
+            }
+            latestAudioUrl = URL.createObjectURL(latestAudioBlob);
+            audioPlayer.src = latestAudioUrl;
 
-            recordButton.disabled = true;
-            stopButton.disabled = false;
+            audioPlayer.hidden = false;
+            transcribeButton.disabled = false;
+            status.textContent = "Recording ready.";
+            }
+        );
 
-            status.textContent = "Recording...";
-        }
-        catch(error){
-            status.textContent = "Could not access microphone.";
-            console.error(error);
-        }
+
+
+        mediaRecorder.start();
+
+        recordButton.disabled = true;
+        stopButton.disabled = false;
+
+        status.textContent = "Recording...";
     }
-);
+    catch(error){
+        status.textContent = "Could not access microphone.";
+        console.error(error);
+    }
+});
 
 
 stopButton.addEventListener("click", function (){
@@ -104,7 +115,8 @@ async function transcribeRecording() {
 
         const result = await response.json();
         transcript.value = result.text;
-        sendButton.disabled = false;
+        // sendButton.disabled = false;
+        updateSendButtonState();
         status.textContent = "Transcription complete. Saved as " + result.filename;
     }
     catch (error){
@@ -116,22 +128,37 @@ async function transcribeRecording() {
 
 
 transcribeButton.addEventListener("click", transcribeRecording);
+transcript.addEventListener("input", updateSendButtonState);
 
 
 async function sendToElbus(){
-    const experimentId = Number(experimentIdInput.value);
+    if (verifiedExperimentId === null){
+        status.textContent = "Please confirm an experiment first.";
+        return;
+    }
+
+    // const experimentId = Number(experimentIdInput.value);
     const text = transcript.value.trim();
 
 
-    if (!experimentId){
-        status.textContent = "Please enter a valid experiment ID.";
-        return;
-    }
+    // if (!experimentId){
+    //     status.textContent = "Please enter a valid experiment ID.";
+    //     return;
+    // }
 
     if (!text){
         status.textContent = "The transcript is empty.";
         return;
     }
+
+
+    const confirmed = window.confirm('Add this voice note to "' + verifiedExperimentTitle + '" (ID ' + verifiedExperimentId + ')?');
+
+    if (!confirmed){
+        status.textContent = "Send cancelled.";
+        return;
+    }
+
 
     status.textContent = "Sending transcript to ELBUS...";
     sendButton.disabled = true;
@@ -140,7 +167,7 @@ async function sendToElbus(){
         const response = await fetch("/append", {
                 method: "POST", 
                 headers: {"Content-Type": "application/json"}, 
-                body: JSON.stringify({experiment_id: experimentId, text: text})
+                body: JSON.stringify({experiment_id: verifiedExperimentId, text: text})
                 }
             );
 
@@ -149,7 +176,8 @@ async function sendToElbus(){
             throw new Error(errorResult.detail || ("Server returned "+ response.status));
         }
 
-        status.textContent = "Transcript added to ELBUS.";
+        resetFormAfterSend();
+        // status.textContent = "Transcript added to ELBUS.";
     }
     catch (error){
         status.textContent = "Could not add transcript: " + error.message;
@@ -160,3 +188,97 @@ async function sendToElbus(){
 
 
 sendButton.addEventListener("click", sendToElbus);
+
+
+function updateSendButtonState(){
+    const hasExperiment = verifiedExperimentId !== null;
+    const hasTranscript = transcript.value.trim() !== "";
+    sendButton.disabled = !(hasExperiment && hasTranscript);
+}
+
+
+async function checkExperiment(){
+    const experimentId = Number(experimentIdInput.value);
+
+    if(!Number.isInteger(experimentId) || experimentId<=0){
+        experimentInfo.textContent = "Please enter a valid experiment ID.";
+        verifiedExperimentId = null;
+        verifiedExperimentTitle = null;
+        updateSendButtonState();
+        return;
+    }
+
+    experimentInfo.textContent = "Checking experiment...";
+    checkExperimentButton.disabled = true;
+
+    try{
+        const response = await fetch("/experiment/" + experimentId);
+
+        if (!response.ok){
+            const errorResult = await response.json();
+            throw new Error(errorResult.detail || ("Server returned " + response.status));
+        }
+
+        const result = await response.json();
+        verifiedExperimentId = result.experiment_id;
+        verifiedExperimentTitle = result.title;
+
+        experimentInfo.textContent = 'Selected experiment: "' + result.title + '" (ID ' + result.experiment_id + ')';
+
+        updateSendButtonState();
+
+    }
+    catch (error){
+        verifiedExperimentId = null;
+        verifiedExperimentTitle = null;
+        experimentInfo.textContent = "Could not find experiment: " + error.message;
+        updateSendButtonState();
+    }
+
+    finally {
+        checkExperimentButton.disabled = false;
+    }
+}
+
+
+checkExperimentButton.addEventListener("click", checkExperiment);
+
+
+experimentIdInput.addEventListener("input", function () {
+        verifiedExperimentId = null;
+        verifiedExperimentTitle = null;
+        experimentInfo.textContent = "Experiment not confirmed.";
+        updateSendButtonState();
+    }
+);
+
+
+function resetFormAfterSend() {
+
+    transcript.value = "";
+    experimentIdInput.value = "";
+
+    verifiedExperimentId = null;
+    verifiedExperimentTitle = null;
+
+    experimentInfo.textContent = "No experiment confirmed.";
+
+    latestAudioBlob = null;
+    audioChunks = [];
+
+    audioPlayer.pause();
+    audioPlayer.removeAttribute("src");
+    audioPlayer.load();
+    audioPlayer.hidden = true;
+    if (latestAudioUrl !== null){
+        URL.revokeObjectURL(latestAudioUrl);
+        latestAudioUrl = null;
+    }
+
+    recordButton.disabled = false;
+    stopButton.disabled = true;
+    transcribeButton.disabled = true;
+    sendButton.disabled = true;
+
+    status.textContent = "Voice note added to ELBUS. " + "Ready for a new recording.";
+}
