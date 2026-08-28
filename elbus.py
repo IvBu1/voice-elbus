@@ -45,7 +45,7 @@ def get_experiment_title(experiment_id: int) -> str:
 	)
 	response.raise_for_status()
 	experiment = response.json()
-	title_and_name = f"{experiment["title"]} by {experiment["fullname"]}"
+	title_and_name = f"{experiment['title']} by {experiment['fullname']}"
 	return title_and_name
 
 
