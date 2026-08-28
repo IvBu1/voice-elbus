@@ -12,6 +12,7 @@ headers={
 	"Authorization": API_WRITE_KEY,
 	"Accept": "application/json",
 }
+REQUEST_TIMEOUT = (5, 15) # first number refers to connection timeout, second to data timeout
 
 def format_voice_note(transcript: str) -> str:
     formatted_transcript = f"""
@@ -27,26 +28,38 @@ def append_voice_note(experiment_id: int,
 	url = f"{BASE_URL}/experiments/{experiment_id}"
 	safe_transcript = escape(transcript)
 
-	response = requests.patch(
-	    url,
-	    headers=headers,
-	    json = {
-	        "bodyappend": format_voice_note(safe_transcript)
-	    }
-	)
-	response.raise_for_status()
+	try:
+		response = requests.patch(
+		    url,
+		    headers=headers,
+		    json={
+		        "bodyappend": format_voice_note(safe_transcript)
+		    },
+		    timeout=REQUEST_TIMEOUT
+		)
+		response.raise_for_status()
+	except requests.exceptions.Timeout:
+		raise RuntimeError("ELBUS request timed out.")
+	except requests.exceptions.ConnectionError:
+		raise RuntimeError("ELBUS cannot be reached from this network.")
 
 def get_experiment_title(experiment_id: int) -> str:
 	url = f"{BASE_URL}/experiments/{experiment_id}"
 
-	response = requests.get(
-		url, 
-		headers=headers
-	)
-	response.raise_for_status()
-	experiment = response.json()
-	title_and_name = f"{experiment['title']} by {experiment['fullname']}"
-	return title_and_name
+	try:
+		response = requests.get(
+			url, 
+			headers=headers,
+			timeout=REQUEST_TIMEOUT
+		)
+		response.raise_for_status()
+		experiment = response.json()
+		title_and_name = f"{experiment['title']} by {experiment['fullname']}"
+		return title_and_name
+	except requests.exceptions.Timeout:
+		raise RuntimeError("ELBUS request timed out.")
+	except requests.exceptions.ConnectionError:
+		raise RuntimeError("ELBUS cannot be reached from this network.")
 
 
 
