@@ -77,6 +77,11 @@ def create_app():
         return {"experiment_id": experiment_id, "title": title}
 
 
+    @app.get("/favicon.ico", include_in_schema=False)
+    def favicon():
+        return FileResponse(STATIC_DIR / "favicon.ico")
+
+
     return app
 
 
