@@ -23,14 +23,11 @@ recordButton.addEventListener("click", async function (){
     try {
         audioStream = await navigator.mediaDevices.getUserMedia({audio: true});
         mediaRecorder = new MediaRecorder(audioStream);
-
         audioChunks = [];
 
         mediaRecorder.addEventListener("dataavailable", function (event){
                 audioChunks.push(event.data);
-            }
-        );
-
+        });
 
         mediaRecorder.addEventListener("stop", function (){
             latestAudioBlob = new Blob(audioChunks, {type: mediaRecorder.mimeType});
@@ -44,10 +41,7 @@ recordButton.addEventListener("click", async function (){
             audioPlayer.hidden = false;
             transcribeButton.disabled = false;
             status.textContent = "Recording ready.";
-            }
-        );
-
-
+        });
 
         mediaRecorder.start();
 
@@ -66,19 +60,17 @@ recordButton.addEventListener("click", async function (){
 stopButton.addEventListener("click", function (){
         mediaRecorder.stop();
         audioStream.getTracks().forEach(function (track){
-                    track.stop();
-                }
-            );
+            track.stop();
+        });
 
         recordButton.disabled = false;
         stopButton.disabled = true;
 
         status.textContent = "Recording stopped.";
-    }
-);
+});
 
 
-function getFileExtension() {
+function getFileExtension(){
     const mimeType = latestAudioBlob.type;
 
     if (mimeType.includes("mp4")) {return "m4a";}
@@ -89,8 +81,7 @@ function getFileExtension() {
 }
 
 
-async function transcribeRecording() {
-
+async function transcribeRecording(){
     if (latestAudioBlob === null){
         status.textContent = "No recording available.";
         return;
@@ -113,7 +104,6 @@ async function transcribeRecording() {
 
         const result = await response.json();
         transcript.value = result.text;
-        // sendButton.disabled = false;
         updateSendButtonState();
         status.textContent = "Transcription complete. Saved as " + result.filename;
     }
@@ -136,31 +126,26 @@ async function sendToElbus(){
     }
 
     const text = transcript.value.trim();
-
     if (!text){
         status.textContent = "The transcript is empty.";
         return;
     }
 
-
     const confirmed = window.confirm('Add this voice note to "' + verifiedExperimentTitle + '" (ID ' + verifiedExperimentId + ')?');
-
     if (!confirmed){
         status.textContent = "Send cancelled.";
         return;
     }
-
 
     status.textContent = "Sending transcript to ELBUS...";
     sendButton.disabled = true;
 
     try {
         const response = await fetch("append", {
-                method: "POST", 
-                headers: {"Content-Type": "application/json"}, 
-                body: JSON.stringify({experiment_id: verifiedExperimentId, text: text})
-                }
-            );
+            method: "POST", 
+            headers: {"Content-Type": "application/json"}, 
+            body: JSON.stringify({experiment_id: verifiedExperimentId, text: text})
+        });
 
         if (!response.ok){
             const errorResult = await response.json();
@@ -168,7 +153,6 @@ async function sendToElbus(){
         }
 
         resetFormAfterSend();
-        // status.textContent = "Transcript added to ELBUS.";
     }
     catch (error){
         status.textContent = "Could not add transcript: " + error.message;
@@ -236,16 +220,14 @@ checkExperimentButton.addEventListener("click", checkExperiment);
 
 
 experimentIdInput.addEventListener("input", function () {
-        verifiedExperimentId = null;
-        verifiedExperimentTitle = null;
-        experimentInfo.textContent = "Experiment not confirmed.";
-        updateSendButtonState();
-    }
-);
+    verifiedExperimentId = null;
+    verifiedExperimentTitle = null;
+    experimentInfo.textContent = "Experiment not confirmed.";
+    updateSendButtonState();
+});
 
 
 function resetFormAfterSend() {
-
     transcript.value = "";
     experimentIdInput.value = "";
 

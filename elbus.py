@@ -60,6 +60,3 @@ def get_experiment_title(experiment_id: int) -> str:
 		raise RuntimeError("ELBUS request timed out.")
 	except requests.exceptions.ConnectionError:
 		raise RuntimeError("ELBUS cannot be reached from this network.")
-
-
-

@@ -45,13 +45,10 @@ def create_app():
             shutil.copyfileobj(file.file, output_file)
         try:
             transcript = transcribe_audio(recording_path)
-        # except Exception as exc:
-        #     raise HTTPException(status_code=500, detail=(f"Transcription failed: {exc}"))
         except Exception as exc:
             print("\n--- TRANSCRIPTION ERROR ---")
             traceback.print_exc()
             print("---------------------------\n")
-
             raise HTTPException(status_code=500, detail=(f"Transcription failed: {exc}"))
         return {"text": transcript, "filename": recording_path.name}
 
@@ -65,7 +62,7 @@ def create_app():
             raise HTTPException(status_code=500, detail=(f"ELBUS request failed: {exc}"))
         return {"ok": True}
 
-
+    # web operation for fetching experiment info from ELBUS
     @app.get("/experiment/{experiment_id}")
     def experiment_info(experiment_id: int):
         try:
@@ -76,7 +73,7 @@ def create_app():
 
         return {"experiment_id": experiment_id, "title": title}
 
-
+    # web operation for fetching logo
     @app.get("/favicon.ico", include_in_schema=False)
     def favicon():
         return FileResponse(STATIC_DIR / "favicon.ico")
@@ -85,15 +82,12 @@ def create_app():
     return app
 
 
-
-
 class AppendRequest(BaseModel):
     experiment_id: int
     text: str
 
 
 def get_audio_suffix(content_type: str | None) -> str:
-
     if not content_type:
         return ".audio"
 
