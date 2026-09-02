@@ -77,7 +77,7 @@ def create_app():
     # web operation for fetching logo
     @app.get("/favicon.ico", include_in_schema=False)
     def favicon():
-        return FileResponse(STATIC_DIR / "favicon.ico")
+        return FileResponse(STATIC_DIR / "logo" / "favicon.ico")
 
     # web operation for checkong on FastAPI
     @app.get("/health")
