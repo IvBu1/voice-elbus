@@ -19,8 +19,25 @@ let latestAudioUrl = null;
 let verifiedExperimentId = null;
 let verifiedExperimentTitle = null;
 
+function clearRecording(){
+    latestAudioBlob = null;
+    audioChunks = [];
+
+    if(latestAudioUrl !== null){
+        URL.revokeObjectURL(latestAudioUrl);
+        latestAudioUrl = null;
+    }
+
+    audioPlayer.pause();
+    audioPlayer.removeAttribute("src");
+    audioPlayer.load();
+    audioPlayer.hidden = true;
+    transcribeButton.disabled = true;
+}
+
 recordButton.addEventListener("click", async function (){
     try {
+        clearRecording();
         audioStream = await navigator.mediaDevices.getUserMedia({audio: true});
         mediaRecorder = new MediaRecorder(audioStream);
         audioChunks = [];
@@ -32,7 +49,7 @@ recordButton.addEventListener("click", async function (){
         mediaRecorder.addEventListener("stop", function (){
             latestAudioBlob = new Blob(audioChunks, {type: mediaRecorder.mimeType});
 
-            if (latestAudioUrl !== null) {
+            if(latestAudioUrl !== null){
                 URL.revokeObjectURL(latestAudioUrl);
             }
             latestAudioUrl = URL.createObjectURL(latestAudioBlob);
@@ -73,16 +90,16 @@ stopButton.addEventListener("click", function (){
 function getFileExtension(){
     const mimeType = latestAudioBlob.type;
 
-    if (mimeType.includes("mp4")) {return "m4a";}
-    if (mimeType.includes("ogg")) {return "ogg";}
-    if (mimeType.includes("webm")) {return "webm";}
+    if(mimeType.includes("mp4")){return "m4a";}
+    if(mimeType.includes("ogg")){return "ogg";}
+    if(mimeType.includes("webm")){return "webm";}
 
     return "audio";
 }
 
 
 async function transcribeRecording(){
-    if (latestAudioBlob === null){
+    if(latestAudioBlob === null){
         status.textContent = "No recording available.";
         return;
     }
@@ -97,7 +114,7 @@ async function transcribeRecording(){
     try {
         const response = await fetch("transcribe", {method: "POST", body: formData});
 
-        if (!response.ok) {
+        if(!response.ok){
             const errorResult = await response.json();
             throw new Error(errorResult.detail || ("Server returned " + response.status));
         }
@@ -120,19 +137,19 @@ transcript.addEventListener("input", updateSendButtonState);
 
 
 async function sendToElbus(){
-    if (verifiedExperimentId === null){
+    if(verifiedExperimentId === null){
         status.textContent = "Please confirm an experiment first.";
         return;
     }
 
     const text = transcript.value.trim();
-    if (!text){
+    if(!text){
         status.textContent = "The transcript is empty.";
         return;
     }
 
     const confirmed = window.confirm('Add this voice note to "' + verifiedExperimentTitle + '" (ID ' + verifiedExperimentId + ')?');
-    if (!confirmed){
+    if(!confirmed){
         status.textContent = "Send cancelled.";
         return;
     }
@@ -147,7 +164,7 @@ async function sendToElbus(){
             body: JSON.stringify({experiment_id: verifiedExperimentId, text: text})
         });
 
-        if (!response.ok){
+        if(!response.ok){
             const errorResult = await response.json();
             throw new Error(errorResult.detail || ("Server returned "+ response.status));
         }
@@ -189,7 +206,7 @@ async function checkExperiment(){
     try{
         const response = await fetch("experiment/" + experimentId);
 
-        if (!response.ok){
+        if(!response.ok){
             const errorResult = await response.json();
             throw new Error(errorResult.detail || ("Server returned " + response.status));
         }
@@ -236,21 +253,10 @@ function resetFormAfterSend() {
 
     experimentInfo.textContent = "No experiment confirmed.";
 
-    latestAudioBlob = null;
-    audioChunks = [];
-
-    audioPlayer.pause();
-    audioPlayer.removeAttribute("src");
-    audioPlayer.load();
-    audioPlayer.hidden = true;
-    if (latestAudioUrl !== null){
-        URL.revokeObjectURL(latestAudioUrl);
-        latestAudioUrl = null;
-    }
+    clearRecording()   
 
     recordButton.disabled = false;
     stopButton.disabled = true;
-    transcribeButton.disabled = true;
     sendButton.disabled = true;
 
     status.textContent = "Voice note added to ELBUS. " + "Ready for a new recording.";
