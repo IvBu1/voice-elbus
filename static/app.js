@@ -122,7 +122,7 @@ async function transcribeRecording(){
         const result = await response.json();
         transcript.value = result.text;
         updateSendButtonState();
-        status.textContent = "Transcription complete. Saved as " + result.filename;
+        status.textContent = "Transcription complete.";
     }
     catch (error){
         status.textContent = "Transcription failed: " + error.message;

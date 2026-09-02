@@ -1,6 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 import shutil
+import tempfile
 import traceback
 
 from fastapi import (
@@ -19,8 +20,6 @@ from transcription import transcribe_audio
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
-RECORDINGS_DIR = BASE_DIR / "recordings"
-RECORDINGS_DIR.mkdir(exist_ok=True)
 
 
 def create_app():
@@ -36,21 +35,23 @@ def create_app():
     # web operation for transcribing
     @app.post("/transcribe")
     def transcribe(file: UploadFile = File(...)):
-
         suffix = get_audio_suffix(file.content_type)
-        timestamp = (datetime.now().strftime("%Y%m%d_%H%M%S_%f"))
-        recording_path = (RECORDINGS_DIR/ f"voice_note_{timestamp}{suffix}")
+        tmp_path = None
 
-        with recording_path.open("wb") as output_file:
-            shutil.copyfileobj(file.file, output_file)
         try:
-            transcript = transcribe_audio(recording_path)
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp_file:
+                shutil.copyfileobj(file.file, tmp_file)
+                tmp_path = Path(tmp_file.name)
+                transcript = transcribe_audio(tmp_path)
+                return {"text": transcript}
         except Exception as exc:
             print("\n--- TRANSCRIPTION ERROR ---")
             traceback.print_exc()
             print("---------------------------\n")
             raise HTTPException(status_code=500, detail=(f"Transcription failed: {exc}"))
-        return {"text": transcript, "filename": recording_path.name}
+        finally:
+            if tmp_path is not None:
+                tmp_path.unlink(missing_ok=True)
 
 
     # web operation for appending text to ELBUS
