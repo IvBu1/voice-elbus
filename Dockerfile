@@ -11,12 +11,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY main.py .
-COPY api.py .
-COPY elbus.py .
-COPY transcription.py .
+COPY backend ./backend
 COPY static ./static
-
-RUN mkdir -p /app/recordings
 
 EXPOSE 8000
 

@@ -15,10 +15,10 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from elbus import append_voice_note, get_experiment_title
-from transcription import transcribe_audio
+from backend.elbus import append_voice_note, get_experiment_title
+from backend.transcription import transcribe_audio
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
 
 
