@@ -6,32 +6,35 @@ from zoneinfo import ZoneInfo
 from html import escape
 
 BASE_URL = "https://elbustest.uni-stuttgart.de/api/v2"
-API_WRITE_KEY = os.environ["ELBUS_API_WRITE_KEY"]
-now = datetime.now(ZoneInfo("Europe/Berlin"))
-headers={
-	"Authorization": API_WRITE_KEY,
-	"Accept": "application/json",
-}
+NOW = datetime.now(ZoneInfo("Europe/Berlin"))
 REQUEST_TIMEOUT = (5, 15) # first number refers to connection timeout, second to data timeout
+
+def get_headers(api_key: str) -> dict:
+    return {
+        "Authorization": api_key,
+        "Content-Type": "application/json"
+    }
+
 
 def format_voice_note(transcript: str) -> str:
     formatted_transcript = f"""
     <p>
-        <strong>Voice note — {now:%Y-%m-%d %H:%M:%S}</strong><br>
+        <strong>Voice note — {NOW:%Y-%m-%d %H:%M:%S}</strong><br>
         {transcript}
     </p>
     """
     return formatted_transcript
 
 def append_voice_note(experiment_id: int,
-					  transcript: str):
+					  transcript: str,
+					  api_key: str):
 	url = f"{BASE_URL}/experiments/{experiment_id}"
 	safe_transcript = escape(transcript)
 
 	try:
 		response = requests.patch(
 		    url,
-		    headers=headers,
+		    headers=get_headers(api_key),
 		    json={
 		        "bodyappend": format_voice_note(safe_transcript)
 		    },
@@ -43,13 +46,14 @@ def append_voice_note(experiment_id: int,
 	except requests.exceptions.ConnectionError:
 		raise RuntimeError("ELBUS cannot be reached from this network.")
 
-def get_experiment_title(experiment_id: int) -> str:
+def get_experiment_title(experiment_id: int,
+						 api_key: str) -> str:
 	url = f"{BASE_URL}/experiments/{experiment_id}"
 
 	try:
 		response = requests.get(
 			url, 
-			headers=headers,
+			headers=get_headers(api_key),
 			timeout=REQUEST_TIMEOUT
 		)
 		response.raise_for_status()
@@ -60,3 +64,26 @@ def get_experiment_title(experiment_id: int) -> str:
 		raise RuntimeError("ELBUS request timed out.")
 	except requests.exceptions.ConnectionError:
 		raise RuntimeError("ELBUS cannot be reached from this network.")
+
+
+def validate_api_key(api_key: str) -> bool:
+    url = f"{BASE_URL}/experiments"
+
+    try:
+        response = requests.get(
+            url,
+            headers=get_headers(api_key),
+            params={"limit": 1},
+            timeout=REQUEST_TIMEOUT
+        )
+
+        if response.status_code in (401, 403):
+            return False
+        response.raise_for_status()
+        return True
+
+    except requests.exceptions.HTTPError:
+        raise
+
+    except requests.exceptions.RequestException as exc:
+        raise RuntimeError("ELBUS could not be reached.") from exc

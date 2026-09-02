@@ -19,6 +19,15 @@
             <p>Record a laboratory note, review the transcription, and add it to ELBUS.</p>
         </header>
 
+        <section class="card" id="loginSection">
+            <h2>Connect to ELBUS</h2>
+            <label for="apiKey">ELBUS API key (with write permissions)</label>
+            <input id="apiKey" type="password" autocomplete="off" placeholder="Enter your ELBUS API key">
+            <button id="loginButton" class="button primary">Connect to ELBUS</button>
+            <button id="logoutButton" class="button secondary" hidden>Disconnect from ELBUS</button>
+            <p id="loginStatus" class="status">Not connected.</p>
+        </section>
+
         <section class="card">
             <h2>1. Record</h2>
             <div class="button-row">
