@@ -78,6 +78,11 @@ def create_app():
     def favicon():
         return FileResponse(STATIC_DIR / "favicon.ico")
 
+    # web operation for checkong on FastAPI
+    @app.get("/health")
+    def health():
+        return {"status": "ok"}
+
 
     return app
 
