@@ -5,7 +5,7 @@ from backend.api import create_app
 
 # use HOST=127.0.0.1 when running local tests
 #     HOST=0.0.0.0   when running in docker
-HOST_IP = os.environ["HOST"]
+HOST_IP = os.environ["HOST_IP"]
 
 
 app = create_app()
