@@ -69,7 +69,7 @@ The application is then available on: `http://localhost:8000`
 ## Execution
 
 Start the application directly with python from the root directory: 
-1) `export HOST="127.0.0.1"` (for local testing)
+1) `export HOST_IP="127.0.0.1"` (for local testing)
 2) `python3 main.py`
 
 
