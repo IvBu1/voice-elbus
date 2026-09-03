@@ -67,23 +67,21 @@ def get_experiment_title(experiment_id: int,
 
 
 def validate_api_key(api_key: str) -> bool:
-    url = f"{BASE_URL}/experiments"
+    url = f"{BASE_URL}/info"
 
     try:
         response = requests.get(
             url,
             headers=get_headers(api_key),
-            params={"limit": 1},
             timeout=REQUEST_TIMEOUT
         )
 
+        # 401: not authenticated, 403: authenticated but access forbidden
         if response.status_code in (401, 403):
             return False
         response.raise_for_status()
         return True
-
-    except requests.exceptions.HTTPError:
-        raise
-
-    except requests.exceptions.RequestException as exc:
-        raise RuntimeError("ELBUS could not be reached.") from exc
+    except requests.exceptions.Timeout:
+        raise RuntimeError("ELBUS request timed out.")
+    except requests.exceptions.ConnectionError:
+        raise RuntimeError("ELBUS cannot be reached from this network.")
