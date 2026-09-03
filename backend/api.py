@@ -1,23 +1,15 @@
 import secrets
-from datetime import datetime, timedelta, timezone
-from dataclasses import dataclass
-from pathlib import Path
 import shutil
 import tempfile
 import traceback
+from datetime import datetime, timedelta, timezone
+from dataclasses import dataclass
+from pathlib import Path
+from pydantic import BaseModel
 
-from fastapi import (
-    FastAPI,
-    File,
-    HTTPException,
-    UploadFile,
-)
-
+from fastapi import FastAPI, File, HTTPException, UploadFile, Cookie, Depends, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi import Cookie, Depends
-from fastapi import Response
-from pydantic import BaseModel
 
 from backend.elbus import append_voice_note, get_experiment_title, validate_api_key
 from backend.transcription import transcribe_audio
@@ -35,10 +27,48 @@ sessions: dict[str, Session] = {}
 class LoginRequest(BaseModel):
     api_key: str
 
-def create_app():
+class AppendRequest(BaseModel):
+    experiment_id: int
+    text: str
 
+def get_audio_suffix(content_type: str | None) -> str:
+    if not content_type:
+        return ".audio"
+    media_type = (content_type.split(";")[0].strip().lower())
+    extensions = {
+        "audio/webm": ".webm",
+        "video/webm": ".webm",
+        "audio/mp4": ".m4a",
+        "video/mp4": ".mp4",
+        "audio/ogg": ".ogg",
+        "audio/wav": ".wav",
+    }
+
+    return extensions.get(media_type, ".audio")
+
+
+def get_api_key_from_session(session_id: str | None) -> str:
+    if session_id is None:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    session = sessions.get(session_id)
+
+    if session is None:
+        raise HTTPException(status_code=401, detail="Session expired.")
+
+    if (session.expires_at < datetime.now(timezone.utc)):
+        sessions.pop(session_id, None)
+        raise HTTPException(status_code=401, detail="Session expired.")
+
+    return session.api_key
+
+def current_api_key(voice_elbus_session: str | None = Cookie(default=None)) -> str:
+    return get_api_key_from_session(voice_elbus_session)
+
+
+def create_app():
     app = FastAPI()
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
 
     # web operation for displaying the website
     @app.get("/")
@@ -46,7 +76,7 @@ def create_app():
         return FileResponse(STATIC_DIR / "index.html")
 
 
-    # web operation for transcribing; we do not use api_key here but this protects this function from being called if there is no valid session
+    # web operation for transcribing; we do not use api_key here but depending on it protects this function from being called if there is no valid session
     @app.post("/transcribe")
     def transcribe(file: UploadFile = File(...),
                    _api_key: str = Depends(current_api_key)):
@@ -86,9 +116,8 @@ def create_app():
                         api_key: str = Depends(current_api_key)):
         try:
             title = get_experiment_title(experiment_id, api_key)
-
         except Exception as exc:
-            raise HTTPException(status_code=500, detail=(f"Could not read experiment: {exc}"))
+            raise HTTPException(status_code=500, detail=(f"Could not read experiment: {exc}")) # error code: internal server error
 
         return {"experiment_id": experiment_id, "title": title}
 
@@ -105,15 +134,15 @@ def create_app():
         api_key = request.api_key.strip()
 
         if not api_key:
-            raise HTTPException(status_code=400, detail="API key is required.")
+            raise HTTPException(status_code=400, detail="API key is required.") # error code: bad request
 
         try:
             valid = validate_api_key(api_key)
         except RuntimeError as exc:
-            raise HTTPException(status_code=502, detail=str(exc))
+            raise HTTPException(status_code=502, detail=str(exc)) # error code: bad gateway
 
         if not valid:
-            raise HTTPException(status_code=401, detail="Invalid ELBUS API key.")
+            raise HTTPException(status_code=401, detail="Invalid ELBUS API key.") # error code: not authorized
 
         session_id = secrets.token_urlsafe(32)
         sessions[session_id] = Session(api_key=api_key, expires_at=(datetime.now(timezone.utc) + timedelta(hours=2)))
@@ -158,46 +187,3 @@ def create_app():
 
 
     return app
-
-
-class AppendRequest(BaseModel):
-    experiment_id: int
-    text: str
-
-
-def get_audio_suffix(content_type: str | None) -> str:
-    if not content_type:
-        return ".audio"
-
-    media_type = (content_type.split(";")[0].strip().lower())
-
-    extensions = {
-        "audio/webm": ".webm",
-        "video/webm": ".webm",
-        "audio/mp4": ".m4a",
-        "video/mp4": ".mp4",
-        "audio/ogg": ".ogg",
-        "audio/wav": ".wav",
-    }
-
-    return extensions.get(media_type, ".audio")
-
-
-def get_api_key_from_session(session_id: str | None) -> str:
-    if session_id is None:
-        raise HTTPException(status_code=401, detail="Not authenticated.")
-
-    session = sessions.get(session_id)
-
-    if session is None:
-        raise HTTPException(status_code=401, detail="Session expired.")
-
-    if (session.expires_at < datetime.now(timezone.utc)):
-        sessions.pop(session_id, None)
-        raise HTTPException(status_code=401, detail="Session expired.")
-
-    return session.api_key
-
-
-def current_api_key(voice_elbus_session: str | None = Cookie(default=None)) -> str:
-    return get_api_key_from_session(voice_elbus_session)

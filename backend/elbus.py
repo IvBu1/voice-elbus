@@ -1,6 +1,4 @@
-import os
 import requests
-from pprint import pprint
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from html import escape
@@ -25,6 +23,7 @@ def format_voice_note(transcript: str) -> str:
     """
     return formatted_transcript
 
+
 def append_voice_note(experiment_id: int,
 					  transcript: str,
 					  api_key: str):
@@ -35,9 +34,7 @@ def append_voice_note(experiment_id: int,
 		response = requests.patch(
 		    url,
 		    headers=get_headers(api_key),
-		    json={
-		        "bodyappend": format_voice_note(safe_transcript)
-		    },
+		    json={"bodyappend": format_voice_note(safe_transcript)},
 		    timeout=REQUEST_TIMEOUT
 		)
 		response.raise_for_status()
@@ -45,6 +42,7 @@ def append_voice_note(experiment_id: int,
 		raise RuntimeError("ELBUS request timed out.")
 	except requests.exceptions.ConnectionError:
 		raise RuntimeError("ELBUS cannot be reached from this network.")
+
 
 def get_experiment_title(experiment_id: int,
 						 api_key: str) -> str:
