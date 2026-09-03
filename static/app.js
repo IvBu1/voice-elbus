@@ -116,7 +116,9 @@ async function authenticatedFetch(url, options={}){
     if(response.status === 401){
         resetWorkflow();
         setAuthenticated(false);
-        throw new Error("Your ELBUS session has expired. Please connect again.");
+        const message = "Your ELBUS session has expired. Please connect again.";
+        loginStatus.textContent = message;
+        throw new Error(message);
     }
 
     return response;
@@ -136,8 +138,11 @@ async function checkAuthentication(){
 
         if(result.authenticated)
             status.textContent = "Ready.";
-        else
+        else{
             status.textContent = "Connect to ELBUS to begin.";
+            if(result.reason === "Session expired.")
+                loginStatus.textContent = "Your ELBUS session has expired. Please connect again.";
+        }
     } catch{
         setAuthenticated(false);
         loginStatus.textContent = "Could not contact the server.";

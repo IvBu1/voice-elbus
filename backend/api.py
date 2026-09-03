@@ -174,8 +174,8 @@ def create_app():
     def auth_status(voice_elbus_session: str | None = Cookie(default=None)):
         try:
             get_api_key_from_session(voice_elbus_session)
-        except HTTPException:
-            return {"authenticated": False}
+        except HTTPException as exc:
+            return {"authenticated": False, "reason": exc.detail}
 
         return {"authenticated": True}
 
