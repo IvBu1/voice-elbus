@@ -15,58 +15,64 @@
 <body>
     <main class="app">
         <header class="app-header">
-            <h1>ELBUS Voice Notes</h1>
-            <p>Record a laboratory note, review the transcription, and add it to ELBUS.</p>
+            <div>
+                <h1>ELBUS Voice Notes</h1>
+                <p>Record a laboratory note, review the transcription, and add it to ELBUS.</p>
+            </div>
+            <button id="logoutButton" class="button danger logout-button" hidden>
+                Disconnect
+            </button>
         </header>
 
-        <section class="card" id="loginSection">
+        <section class="card login-card" id="loginSection">
             <h2>Connect to ELBUS</h2>
             <label for="apiKey">ELBUS API key (with write permissions)</label>
             <input id="apiKey" type="password" autocomplete="off" placeholder="Enter your ELBUS API key">
             <button id="loginButton" class="button primary">Connect to ELBUS</button>
-            <button id="logoutButton" class="button secondary" hidden>Disconnect from ELBUS</button>
             <p id="loginStatus" class="status">Not connected.</p>
         </section>
 
-        <section class="card">
-            <h2>1. Record</h2>
-            <div class="button-row">
-                <button id="recordButton" class="button primary">Start recording</button>
-                <button id="stopButton" class="button secondary" disabled>Stop</button>
-            </div>
+        <div id="workflow" hidden>
+            <section class="card">
+                <h2>1. Record</h2>
+                <div class="button-row">
+                    <button id="recordButton" class="button primary">Start recording</button>
+                    <button id="stopButton" class="button secondary" disabled>Stop</button>
+                </div>
 
-            <p id="status" class="status">Ready.</p>
+                <p id="status" class="status">Ready.</p>
 
-            <audio id="audioPlayer" controls hidden></audio>
-        </section>
+                <audio id="audioPlayer" controls hidden></audio>
+            </section>
 
-        <section class="card">
-            <h2>2. Transcribe</h2>
-            <button id="transcribeButton" class="button primary" disabled>Transcribe recording</button>
-            <label for="transcript">Transcript</label>
-            <textarea
-                id="transcript"
-                rows="6"
-                placeholder="The transcription will appear here..."
-            ></textarea>
-        </section>
+            <section class="card">
+                <h2>2. Transcribe</h2>
+                <button id="transcribeButton" class="button primary" disabled>Transcribe recording</button>
+                <label for="transcript">Transcript</label>
+                <textarea
+                    id="transcript"
+                    rows="6"
+                    placeholder="The transcription will appear here..."
+                ></textarea>
+            </section>
 
-        <section class="card">
-            <h2>3. Select experiment</h2>
-            <label for="experimentId">Experiment ID</label>
-            <div class="experiment-row">
-                <input id="experimentId" type="number" min="1" placeholder="e.g. 123">
-                <button id="checkExperimentButton" class="button secondary">
-                    Check experiment
-                </button>
-            </div>
-            <p id="experimentInfo" class="experiment-info">No experiment confirmed.</p>
-        </section>
+            <section class="card">
+                <h2>3. Select experiment</h2>
+                <label for="experimentId">Experiment ID</label>
+                <div class="experiment-row">
+                    <input id="experimentId" type="number" min="1" placeholder="e.g. 123">
+                    <button id="checkExperimentButton" class="button secondary">
+                        Check experiment
+                    </button>
+                </div>
+                <p id="experimentInfo" class="experiment-info">No experiment confirmed.</p>
+            </section>
 
-        <section class="card send-card">
-            <h2>4. Send</h2>
-            <button id="sendButton" class="button success" disabled>Add transcript to ELBUS</button>
-        </section>
+            <section class="card send-card">
+                <h2>4. Send</h2>
+                <button id="sendButton" class="button success" disabled>Add transcript to ELBUS</button>
+            </section>
+        </div>
 
     </main>
 

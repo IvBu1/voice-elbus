@@ -15,6 +15,8 @@ const apiKeyInput = document.getElementById("apiKey");
 const loginButton = document.getElementById("loginButton");
 const logoutButton = document.getElementById("logoutButton");
 const loginStatus = document.getElementById("loginStatus");
+const loginSection = document.getElementById("loginSection");
+const workflow = document.getElementById("workflow");
 
 let mediaRecorder;
 let audioStream;
@@ -34,6 +36,9 @@ function updateSendButtonState(){
 
 function setAuthenticated(authenticated){
     isAuthenticated = authenticated;
+    loginSection.hidden = authenticated;
+    workflow.hidden = !authenticated;
+
     if(authenticated){
         loginStatus.textContent = "Connected to ELBUS.";
         apiKeyInput.disabled = true;
@@ -189,7 +194,7 @@ logoutButton.addEventListener("click", async function(){
         isAuthenticated = false;
         logoutButton.disabled = true;
         disableWorkflowControls();
-        status.textContent = "Disconnecting from ELBUS...";
+        loginStatus.textContent = "Disconnecting from ELBUS...";
 
         try {
             await fetch("auth/logout", {
@@ -313,7 +318,6 @@ async function transcribeRecording(){
 
     formData.append("file", latestAudioBlob, "recording." + extension); // exactly "file" is requested by our FastAPI function
     status.textContent = "Uploading and transcribing...";
-    transcribeButton.disabled = true;
 
     try {
         const response = await authenticatedFetch("transcribe", {method: "POST", body: formData});
