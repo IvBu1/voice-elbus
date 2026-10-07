@@ -69,7 +69,13 @@
 
             <section class="card send-card">
                 <h2>3. Send</h2>
+                <label class="attachment-option" for="attachAudio">
+                    <input id="attachAudio" type="checkbox" checked disabled>
+                    Attach original audio <span id="audioSize"></span>
+                </label>
+                <p>The audio is uploaded to ELBUS with the note. Maximum attachment size: 50 MiB.</p>
                 <button id="sendButton" class="button success" disabled>Add transcript to ELBUS</button>
+                <button id="continueWithoutAudioButton" class="button secondary" hidden>Continue without audio</button>
             </section>
         </div>
 

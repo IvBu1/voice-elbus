@@ -87,3 +87,15 @@ Deployment within University of Stuttgart infrastructure is currently being inve
 After connecting, the application loads accessible experiments using the personal API key held in the server session. The authenticated `GET /experiments` route retrieves all pages from eLabFTW with `scope=3` (all accessible experiments of the user). Options show the title, owner (when available), and ID. Use **Refresh experiments** to reload the list or retry a failed request.
 
 Recording and transcript review share one step, with audio playback and an editable transcript. During transcription, recording and sending are disabled. Failed transcription keeps the audio available and shows **Retry transcription**. Sending clears the note and recording while retaining the selected experiment for the next note.
+
+## Original audio attachments
+
+**Attach original audio** is enabled by default. The recording size is displayed before sending, and the confirmation includes the audio when selected. Uncheck this option to send only the transcript. Attachments have a 50 MiB limit.
+
+The note header, audio filename, and attachment comment share a timestamp generated at submission time in Europe/Berlin. The note also names the matching audio file. For example, `Voice note — 2026-10-07 15:42:08.123456` corresponds to `voice-note-2026-10-07_15-42-08.123456.webm`.
+
+The browser sends the transcript to authenticated `POST /voice-notes`, then sends the recording as raw audio to `POST /voice-notes/{submission_id}/audio`. The backend forwards it to the experiment's eLabFTW uploads endpoint using multipart upload. Attachment bytes are held only in bounded request memory; this upload path creates no server files and retains no audio in the session. Transcription still uses the existing temporary file, which is deleted after processing.
+
+If audio upload fails after the text is saved, the recording stays available and **Retry audio upload** retries that part. **Continue without audio** clears the local note so the user can record again; an unconfirmed upload may already exist in ELBUS, so the status advises checking there before uploading manually. A note submitted with audio enabled names its intended attachment even when the upload is not completed.
+
+Submission progress is kept in the existing in-memory session. Retries reuse the same submission ID, timestamp, and destination. After an unconfirmed request, the backend checks the experiment body or attachment list before repeating the write. Progress is lost on logout, session expiry, or server restart, and the browser recording and retry ID are lost on page reload. Check ELBUS before resubmitting after those events.

@@ -10,6 +10,9 @@ const experimentIdInput = document.getElementById("experimentId");
 const refreshExperimentsButton = document.getElementById("refreshExperimentsButton");
 const experimentInfo = document.getElementById("experimentInfo");
 const sendButton = document.getElementById("sendButton");
+const attachAudio = document.getElementById("attachAudio");
+const audioSize = document.getElementById("audioSize");
+const continueWithoutAudioButton = document.getElementById("continueWithoutAudioButton");
 
 const apiKeyInput = document.getElementById("apiKey");
 const loginButton = document.getElementById("loginButton");
@@ -30,12 +33,23 @@ let noteVersion = 0;
 let isRecording = false;
 let isTranscribing = false;
 let isSending = false;
+let pendingSubmission = null;
+let isLoadingExperiments = false;
 
 function updateNoteControls(){
     const busy = isRecording || isTranscribing || isSending;
-    recordButton.disabled = !isAuthenticated || busy;
-    transcript.disabled = !isAuthenticated || busy;
-    transcribeButton.disabled = !isAuthenticated || busy || latestAudioBlob === null;
+    const isActionDisabled = !isAuthenticated || busy || pendingSubmission !== null;
+    recordButton.disabled = isActionDisabled;
+    transcript.disabled = isActionDisabled;
+    transcribeButton.disabled = isActionDisabled || latestAudioBlob === null;
+    attachAudio.disabled = isActionDisabled || latestAudioBlob === null;
+    experimentIdInput.disabled = isActionDisabled || isLoadingExperiments || experimentIdInput.options.length <= 1;
+    refreshExperimentsButton.disabled = isActionDisabled || isLoadingExperiments;
+    sendButton.textContent = pendingSubmission
+        ? (pendingSubmission.transcriptSaved ? "Retry audio upload" : "Retry sending voice note")
+        : "Add transcript to ELBUS";
+    continueWithoutAudioButton.hidden = !pendingSubmission?.transcriptSaved || busy;
+    continueWithoutAudioButton.disabled = !isAuthenticated || busy;
     updateSendButtonState();
 }
 
@@ -43,7 +57,8 @@ function updateNoteControls(){
 function updateSendButtonState(){
     const hasExperiment = verifiedExperimentId !== null;
     const hasTranscript = transcript.value.trim() !== "";
-    sendButton.disabled = !isAuthenticated || isRecording || isTranscribing || isSending || !(hasExperiment && hasTranscript);
+    sendButton.disabled = !isAuthenticated || isRecording || isTranscribing || isSending
+        || (!pendingSubmission && !(hasExperiment && hasTranscript));
 }
 
 function setAuthenticated(authenticated){
@@ -62,6 +77,7 @@ function setAuthenticated(authenticated){
         refreshExperimentsButton.disabled = false;
     } else {
         experimentsRequestVersion++;
+        isLoadingExperiments = false;
         experimentIdInput.replaceChildren(new Option("Connect to load experiments", ""));
         verifiedExperimentId = null;
         verifiedExperimentTitle = null;
@@ -89,6 +105,8 @@ function disableWorkflowControls(){
     experimentIdInput.disabled = true;
     refreshExperimentsButton.disabled = true;
     sendButton.disabled = true;
+    attachAudio.disabled = true;
+    continueWithoutAudioButton.disabled = true;
 }
 
 function resetFormAfterSend() {
@@ -239,6 +257,9 @@ function clearRecording(){
     isRecording = false;
     isTranscribing = false;
     isSending = false;
+    pendingSubmission = null;
+    audioSize.textContent = "";
+    continueWithoutAudioButton.hidden = true;
     latestAudioBlob = null;
 
     if(latestAudioUrl !== null){
@@ -265,7 +286,7 @@ function getFileExtension(){
 }
 
 recordButton.addEventListener("click", async function (){
-    if(!isAuthenticated || isRecording || isTranscribing || isSending)
+    if(!isAuthenticated || isRecording || isTranscribing || isSending || pendingSubmission)
         return;
     clearRecording();
     transcript.value = "";
@@ -297,6 +318,7 @@ recordButton.addEventListener("click", async function (){
             latestAudioUrl = URL.createObjectURL(latestAudioBlob);
             audioPlayer.src = latestAudioUrl;
             audioPlayer.hidden = false;
+            audioSize.textContent = "(" + (latestAudioBlob.size / (1024 * 1024)).toFixed(2) + " MiB)";
             transcribeRecording();
         });
 
@@ -329,7 +351,7 @@ stopButton.addEventListener("click", function (){
 
 // +++++++ transcription +++++++
 async function transcribeRecording(){
-    if(!isAuthenticated || isRecording || isTranscribing || isSending || latestAudioBlob === null)
+    if(!isAuthenticated || isRecording || isTranscribing || isSending || pendingSubmission || latestAudioBlob === null)
         return;
 
     const version = noteVersion;
@@ -391,46 +413,81 @@ async function getErrorMessage(response, fallbackMessage){
 async function sendToElbus(){
     if(!isAuthenticated || isRecording || isTranscribing || isSending)
         return;
-    if(verifiedExperimentId === null){
-        status.textContent = "Please select an experiment first.";
-        return;
+    if(!pendingSubmission){
+        if(verifiedExperimentId === null){
+            status.textContent = "Please select an experiment first.";
+            return;
+        }
+        const text = transcript.value.trim();
+        if(!text){
+            status.textContent = "The transcript is empty.";
+            return;
+        }
+        const includeAudio = attachAudio.checked && latestAudioBlob !== null;
+        if(includeAudio && latestAudioBlob.size > 50 * 1024 * 1024){
+            status.textContent = "The audio exceeds 50 MiB. Uncheck Attach original audio to send only the transcript.";
+            return;
+        }
+        const confirmed = window.confirm('Add this voice note' + (includeAudio ? ' and its original audio' : '')
+            + ' to "' + verifiedExperimentTitle + '" (ID ' + verifiedExperimentId + ')?');
+        if(!confirmed){
+            status.textContent = "Send cancelled.";
+            return;
+        }
+        pendingSubmission = {
+            submission_id: crypto.randomUUID(),
+            experiment_id: verifiedExperimentId,
+            text,
+            audio_type: includeAudio
+                ? (latestAudioBlob.type.split(";")[0].toLowerCase() || "application/octet-stream")
+                : null,
+            transcriptSaved: false
+        };
     }
-
-    const text = transcript.value.trim();
-    if(!text){
-        status.textContent = "The transcript is empty.";
-        return;
-    }
-
-    const confirmed = window.confirm('Add this voice note to "' + verifiedExperimentTitle + '" (ID ' + verifiedExperimentId + ')?');
-    if(!confirmed){
-        status.textContent = "Send cancelled.";
-        return;
-    }
-
+    const submission = pendingSubmission;
     const version = noteVersion;
     isSending = true;
     updateNoteControls();
-    status.textContent = "Sending transcript to ELBUS...";
 
     try {
-        const response = await authenticatedFetch("append", {
-            method: "POST", 
-            headers: {"Content-Type": "application/json"}, 
-            body: JSON.stringify({experiment_id: verifiedExperimentId, text: text})
-        });
-
-        if(!response.ok){
-            const errorResult = await response.json();
-            throw new Error(errorResult.detail || ("Server returned "+ response.status));
+        if(!submission.transcriptSaved){
+            status.textContent = "Sending transcript to ELBUS...";
+            const response = await authenticatedFetch("voice-notes", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    submission_id: submission.submission_id,
+                    experiment_id: submission.experiment_id,
+                    text: submission.text,
+                    audio_type: submission.audio_type
+                })
+            });
+            if(!response.ok)
+                throw new Error(await getErrorMessage(response, "Could not confirm the transcript was saved."));
+            if(version !== noteVersion || !isAuthenticated)
+                return;
+            submission.transcriptSaved = true;
         }
-
-        if(version === noteVersion && isAuthenticated)
-            resetFormAfterSend();
-    }
-    catch(error){
+        if(submission.audio_type){
+            status.textContent = "Transcript saved. Uploading original audio to ELBUS...";
+            const response = await authenticatedFetch("voice-notes/" + submission.submission_id + "/audio", {
+                method: "POST",
+                headers: {"Content-Type": submission.audio_type},
+                body: latestAudioBlob
+            });
+            if(!response.ok)
+                throw new Error(await getErrorMessage(response, "Could not confirm the audio was uploaded."));
+        }
         if(version === noteVersion && isAuthenticated){
-            status.textContent = "Could not add transcript: " + error.message;
+            resetFormAfterSend();
+            status.textContent = (submission.audio_type ? "Voice note and original audio added to ELBUS. " : "Voice note added to ELBUS. ")
+                + "Ready for a new recording.";
+        }
+    } catch(error){
+        if(version === noteVersion && isAuthenticated){
+            status.textContent = submission.transcriptSaved
+                ? "The transcript is saved. " + error.message + " Retry the audio upload or continue without audio."
+                : error.message + " Retry sending to confirm the result without duplicating the note.";
             console.error(error);
         }
     } finally{
@@ -441,11 +498,21 @@ async function sendToElbus(){
 }
 
 sendButton.addEventListener("click", sendToElbus);
+continueWithoutAudioButton.addEventListener("click", function(){
+    if(!isAuthenticated || isSending || !pendingSubmission?.transcriptSaved)
+        return;
+    resetFormAfterSend();
+    updateNoteControls();
+    status.textContent = "The transcript is saved. Audio attachment was not confirmed; check ELBUS before uploading it manually. Ready for a new recording.";
+});
 // ------- ELBUS submission -------
 
 
 // +++++++ experiment selection +++++++
 async function loadExperiments(){
+    if(pendingSubmission || isSending)
+        return;
+    isLoadingExperiments = true;
     const requestVersion = ++experimentsRequestVersion;
     const previousId = experimentIdInput.value;
     verifiedExperimentId = null;
@@ -486,8 +553,8 @@ async function loadExperiments(){
         experimentInfo.textContent = error.message + " Try refreshing the experiments.";
     } finally{
         if(requestVersion === experimentsRequestVersion){
-            refreshExperimentsButton.disabled = !isAuthenticated;
-            updateSendButtonState();
+            isLoadingExperiments = false;
+            updateNoteControls();
         }
     }
 }

@@ -272,6 +272,20 @@ audio {
     margin-top: 26px;
 }
 
+.attachment-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.attachment-option input {
+    width: auto;
+}
+
+#continueWithoutAudioButton {
+    margin-top: 12px;
+}
+
 
 @media (max-width: 600px) {
 

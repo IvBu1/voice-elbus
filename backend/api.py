@@ -3,15 +3,21 @@ import shutil
 import tempfile
 import traceback
 from datetime import datetime, timedelta, timezone
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from threading import Lock
+from uuid import UUID
 from pydantic import BaseModel
 
-from fastapi import FastAPI, File, HTTPException, UploadFile, Cookie, Depends, Response
+from fastapi import FastAPI, File, HTTPException, UploadFile, Cookie, Depends, Response, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
-from backend.elbus import append_voice_note, get_experiment_title, get_experiments, validate_api_key
+from backend.elbus import (
+    AUDIO_EXTENSIONS, VoiceNote, append_voice_note,
+    get_experiment_title, get_experiments, validate_api_key,
+)
 from backend.transcription import transcribe_audio
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,6 +27,8 @@ STATIC_DIR = BASE_DIR / "static"
 class Session:
     api_key: str
     expires_at: datetime
+    notes: dict[str, VoiceNote] = field(default_factory=dict)
+    notes_lock: Lock = field(default_factory=Lock)
 
 sessions: dict[str, Session] = {}
 
@@ -30,6 +38,12 @@ class LoginRequest(BaseModel):
 class AppendRequest(BaseModel):
     experiment_id: int
     text: str
+
+class VoiceNoteRequest(AppendRequest):
+    submission_id: UUID
+    audio_type: str | None = None
+
+MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024
 
 def get_audio_suffix(content_type: str | None) -> str:
     if not content_type:
@@ -63,6 +77,10 @@ def get_api_key_from_session(session_id: str | None) -> str:
 
 def current_api_key(voice_elbus_session: str | None = Cookie(default=None)) -> str:
     return get_api_key_from_session(voice_elbus_session)
+
+def current_session(voice_elbus_session: str | None = Cookie(default=None)) -> Session:
+    get_api_key_from_session(voice_elbus_session)
+    return sessions[voice_elbus_session]
 
 
 def create_app():
@@ -109,6 +127,54 @@ def create_app():
             raise HTTPException(status_code=500, detail=(f"ELBUS request failed: {exc}"))
         return {"ok": True}
 
+
+    @app.post("/voice-notes")
+    def save_voice_note(request: VoiceNoteRequest,
+                        session: Session = Depends(current_session)):
+        if request.experiment_id <= 0 or not request.text.strip():
+            raise HTTPException(status_code=400, detail="Select an experiment and enter a transcript.")
+        if request.audio_type is not None and request.audio_type not in AUDIO_EXTENSIONS:
+            raise HTTPException(status_code=400, detail="Unsupported audio format.")
+        submission_id = str(request.submission_id)
+        with session.notes_lock:
+            note = session.notes.get(submission_id)
+            if note is None:
+                note = VoiceNote(request.experiment_id, request.text, request.audio_type)
+                session.notes[submission_id] = note
+            elif (note.experiment_id, note.text, note.audio_type) != (
+                    request.experiment_id, request.text, request.audio_type):
+                raise HTTPException(status_code=409, detail="A retry must use the original note and destination.")
+        try:
+            note.save_transcript(session.api_key)
+        except Exception:
+            # Keep progress so retrying the same submission can reconcile a lost response.
+            raise HTTPException(status_code=502, detail="Could not confirm the transcript was saved. Retry this submission.")
+        return {"ok": True, **note.progress()}
+
+    @app.post("/voice-notes/{submission_id}/audio")
+    async def save_voice_note_audio(submission_id: UUID, request: Request,
+                                    session: Session = Depends(current_session)):
+        note = session.notes.get(str(submission_id))
+        if note is None:
+            raise HTTPException(status_code=404, detail="Voice note submission not found in this session.")
+        if not note.transcript_saved or note.audio_type is None:
+            raise HTTPException(status_code=409, detail="Save the transcript with audio enabled first.")
+        media_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
+        if media_type != note.audio_type:
+            raise HTTPException(status_code=400, detail="Audio format does not match this submission.")
+        # Receive raw audio in bounded memory, avoiding multipart temporary files.
+        audio = bytearray()
+        async for chunk in request.stream():
+            if len(audio) + len(chunk) > MAX_ATTACHMENT_BYTES:
+                raise HTTPException(status_code=413, detail="Audio attachments must be no larger than 50 MiB.")
+            audio.extend(chunk)
+        if not audio:
+            raise HTTPException(status_code=400, detail="The audio recording is empty.")
+        try:
+            await run_in_threadpool(note.save_audio, bytes(audio), session.api_key)
+        except Exception:
+            raise HTTPException(status_code=502, detail="The transcript is saved, but the audio upload could not be confirmed. Retry the audio upload.")
+        return {"ok": True, **note.progress()}
 
     @app.get("/experiments")
     def experiments(api_key: str = Depends(current_api_key)):
