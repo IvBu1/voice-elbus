@@ -108,6 +108,7 @@ label {
 }
 
 
+select,
 textarea,
 input {
     width: 100%;
@@ -139,6 +140,7 @@ textarea {
 }
 
 
+select:focus,
 textarea:focus,
 input:focus {
     border-color: #4a77c9;

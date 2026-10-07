@@ -7,7 +7,7 @@ const transcribeButton = document.getElementById("transcribeButton");
 const transcript = document.getElementById("transcript");
 
 const experimentIdInput = document.getElementById("experimentId");
-const checkExperimentButton = document.getElementById("checkExperimentButton");
+const refreshExperimentsButton = document.getElementById("refreshExperimentsButton");
 const experimentInfo = document.getElementById("experimentInfo");
 const sendButton = document.getElementById("sendButton");
 
@@ -26,6 +26,7 @@ let latestAudioUrl = null;
 let verifiedExperimentId = null;
 let verifiedExperimentTitle = null;
 let isAuthenticated = false;
+let experimentsRequestVersion = 0;
 
 // +++++++ state management +++++++
 function updateSendButtonState(){
@@ -46,9 +47,13 @@ function setAuthenticated(authenticated){
         logoutButton.hidden = false;
         recordButton.disabled = false;
         transcript.disabled = false;
-        experimentIdInput.disabled = false;
-        checkExperimentButton.disabled = false;
+        experimentIdInput.disabled = experimentIdInput.options.length <= 1;
+        refreshExperimentsButton.disabled = false;
     } else {
+        experimentsRequestVersion++;
+        experimentIdInput.replaceChildren(new Option("Connect to load experiments", ""));
+        verifiedExperimentId = null;
+        verifiedExperimentTitle = null;
         loginStatus.textContent = "Not connected to ELBUS.";
         apiKeyInput.disabled = false;
         loginButton.hidden = false;
@@ -58,7 +63,7 @@ function setAuthenticated(authenticated){
         transcribeButton.disabled = true;
         transcript.disabled = true;
         experimentIdInput.disabled = true;
-        checkExperimentButton.disabled = true;
+        refreshExperimentsButton.disabled = true;
         sendButton.disabled = true;
     }
 
@@ -71,7 +76,7 @@ function disableWorkflowControls(){
     transcribeButton.disabled = true;
     transcript.disabled = true;
     experimentIdInput.disabled = true;
-    checkExperimentButton.disabled = true;
+    refreshExperimentsButton.disabled = true;
     sendButton.disabled = true;
 }
 
@@ -80,7 +85,7 @@ function resetFormAfterSend() {
     experimentIdInput.value = "";
     verifiedExperimentId = null;
     verifiedExperimentTitle = null;
-    experimentInfo.textContent = "No experiment confirmed.";
+    experimentInfo.textContent = "No experiment selected.";
     clearRecording()   
     recordButton.disabled = !isAuthenticated;
     stopButton.disabled = true;
@@ -93,7 +98,7 @@ function resetWorkflow(){
     experimentIdInput.value = "";
     verifiedExperimentId = null;
     verifiedExperimentTitle = null;
-    experimentInfo.textContent = "No experiment confirmed.";
+    experimentInfo.textContent = "No experiment selected.";
     if(audioStream){
         audioStream.getTracks().forEach(function (track){
             track.stop();
@@ -136,8 +141,10 @@ async function checkAuthentication(){
         const result = await response.json();
         setAuthenticated(result.authenticated);
 
-        if(result.authenticated)
+        if(result.authenticated){
             status.textContent = "Ready.";
+            await loadExperiments();
+        }
         else{
             status.textContent = "Connect to ELBUS to begin.";
             if(result.reason === "Session expired.")
@@ -178,6 +185,7 @@ loginButton.addEventListener("click", async function(){
             apiKeyInput.value = "";
             setAuthenticated(true);
             status.textContent = "Ready.";
+            await loadExperiments();
         } catch(error){
             setAuthenticated(false);
             loginStatus.textContent = error.message;
@@ -368,7 +376,7 @@ async function getErrorMessage(response, fallbackMessage){
 // +++++++ ELBUS submission +++++++
 async function sendToElbus(){
     if(verifiedExperimentId === null){
-        status.textContent = "Please confirm an experiment first.";
+        status.textContent = "Please select an experiment first.";
         return;
     }
 
@@ -412,57 +420,67 @@ sendButton.addEventListener("click", sendToElbus);
 // ------- ELBUS submission -------
 
 
-// +++++++ experiment verification +++++++
-async function checkExperiment(){
-    const experimentId = Number(experimentIdInput.value);
-
-    if(!Number.isInteger(experimentId) || experimentId<=0){
-        experimentInfo.textContent = "Please enter a valid experiment ID.";
-        verifiedExperimentId = null;
-        verifiedExperimentTitle = null;
-        updateSendButtonState();
-        return;
-    }
-
-    experimentInfo.textContent = "Checking experiment...";
-    checkExperimentButton.disabled = true;
+// +++++++ experiment selection +++++++
+async function loadExperiments(){
+    const requestVersion = ++experimentsRequestVersion;
+    const previousId = experimentIdInput.value;
+    verifiedExperimentId = null;
+    verifiedExperimentTitle = null;
+    experimentIdInput.replaceChildren(new Option("Loading experiments...", ""));
+    experimentIdInput.disabled = true;
+    refreshExperimentsButton.disabled = true;
+    experimentInfo.textContent = "Loading accessible experiments...";
+    updateSendButtonState();
 
     try{
-        const response = await authenticatedFetch("experiment/" + experimentId);
-
-        if(!response.ok){
-            const errorResult = await response.json();
-            throw new Error(errorResult.detail || ("Server returned " + response.status));
-        }
-
+        const response = await authenticatedFetch("experiments");
+        if(!response.ok)
+            throw new Error(await getErrorMessage(response, "Could not load experiments."));
         const result = await response.json();
-        verifiedExperimentId = result.experiment_id;
-        verifiedExperimentTitle = result.title;
+        if(requestVersion !== experimentsRequestVersion || !isAuthenticated)
+            return;
 
-        experimentInfo.textContent = 'Selected experiment: "' + result.title + '" (ID ' + result.experiment_id + ')';
-
-        updateSendButtonState();
-    }
-    catch(error){
-        verifiedExperimentId = null;
-        verifiedExperimentTitle = null;
-        experimentInfo.textContent = "Could not find experiment: " + error.message;
-        updateSendButtonState();
-    }
-    finally{
-        checkExperimentButton.disabled = !isAuthenticated;
+        experimentIdInput.replaceChildren(new Option(
+            result.experiments.length ? "Select an experiment" : "No accessible experiments", ""
+        ));
+        for(const experiment of result.experiments){
+            const title = experiment.title + (experiment.fullname ? " by " + experiment.fullname : "");
+            const option = new Option(title + " (ID " + experiment.id + ")", String(experiment.id));
+            option.dataset.title = title;
+            experimentIdInput.add(option);
+        }
+        experimentIdInput.disabled = result.experiments.length === 0;
+        if([...experimentIdInput.options].some(option => option.value === previousId))
+            experimentIdInput.value = previousId;
+        selectExperiment();
+        if(!result.experiments.length)
+            experimentInfo.textContent = "No experiments are accessible with this API key.";
+    } catch(error){
+        if(requestVersion !== experimentsRequestVersion || !isAuthenticated)
+            return;
+        experimentIdInput.replaceChildren(new Option("Could not load experiments", ""));
+        experimentInfo.textContent = error.message + " Try refreshing the experiments.";
+    } finally{
+        if(requestVersion === experimentsRequestVersion){
+            refreshExperimentsButton.disabled = !isAuthenticated;
+            updateSendButtonState();
+        }
     }
 }
 
-checkExperimentButton.addEventListener("click", checkExperiment);
-
-experimentIdInput.addEventListener("input", function (){
-    verifiedExperimentId = null;
-    verifiedExperimentTitle = null;
-    experimentInfo.textContent = "Experiment not confirmed.";
+function selectExperiment(){
+    const option = experimentIdInput.selectedOptions[0];
+    verifiedExperimentId = option && option.value ? Number(option.value) : null;
+    verifiedExperimentTitle = verifiedExperimentId !== null ? option.dataset.title : null;
+    experimentInfo.textContent = verifiedExperimentId !== null
+        ? 'Selected experiment: "' + verifiedExperimentTitle + '" (ID ' + verifiedExperimentId + ')'
+        : "No experiment selected.";
     updateSendButtonState();
-});
-// ------- experiment verification -------
+}
+
+refreshExperimentsButton.addEventListener("click", loadExperiments);
+experimentIdInput.addEventListener("change", selectExperiment);
+// ------- experiment selection -------
 
 
 // initial page state

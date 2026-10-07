@@ -58,14 +58,16 @@
 
             <section class="card">
                 <h2>3. Select experiment</h2>
-                <label for="experimentId">Experiment ID</label>
+                <label for="experimentId">Accessible experiments</label>
                 <div class="experiment-row">
-                    <input id="experimentId" type="number" min="1" placeholder="e.g. 123">
-                    <button id="checkExperimentButton" class="button secondary">
-                        Check experiment
+                    <select id="experimentId" disabled aria-describedby="experimentInfo">
+                        <option value="">Connect to load experiments</option>
+                    </select>
+                    <button id="refreshExperimentsButton" class="button secondary" disabled>
+                        Refresh experiments
                     </button>
                 </div>
-                <p id="experimentInfo" class="experiment-info">No experiment confirmed.</p>
+                <p id="experimentInfo" class="experiment-info" role="status">No experiment selected.</p>
             </section>
 
             <section class="card send-card">

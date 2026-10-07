@@ -11,7 +11,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile, Cookie, Depends, R
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.elbus import append_voice_note, get_experiment_title, validate_api_key
+from backend.elbus import append_voice_note, get_experiment_title, get_experiments, validate_api_key
 from backend.transcription import transcribe_audio
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -108,6 +108,14 @@ def create_app():
         except Exception as exc:
             raise HTTPException(status_code=500, detail=(f"ELBUS request failed: {exc}"))
         return {"ok": True}
+
+
+    @app.get("/experiments")
+    def experiments(api_key: str = Depends(current_api_key)):
+        try:
+            return {"experiments": get_experiments(api_key)}
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Could not load experiments: {exc}")
 
 
     # web operation for fetching experiment info from ELBUS

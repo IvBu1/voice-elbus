@@ -7,7 +7,7 @@ The application allows a user to:
 2) Record a voice note in the browser.
 3) Transcribe the recording using OpenAI Whisper running on the server.
 4) Review and edit the generated transcript.
-5) Select and verify an ELBUS experiment.
+5) Select an accessible ELBUS experiment from the dropdown.
 6) Append the approved transcript to the experiment using the eLabFTW REST API.
 7) Logout of session.
 
@@ -38,7 +38,7 @@ The application consists of a small browser frontend and a Python backend.
 4) temporary audio file deleted
 5) transcript returned to browser
 6) user reviews/edits transcript
-7) approved transcript send to provided experiment ID in ELBUS
+7) approved transcript sent to the selected experiment in ELBUS
 
 Uploaded audio is written only to a temporary file required for transcription and is deleted immediately after the transcription attempt, including when transcription fails.
 
@@ -80,3 +80,8 @@ Deployment within University of Stuttgart infrastructure is currently being inve
 - access ELBUS from within the University of Stuttgart network
 - ability to run Docker containers or an equivalent Python environment
 - authentication is currently realized via providing personal ELBUS API key, which is handled on backend and not accessible directly through the frontend
+
+
+## Experiment selection
+
+After connecting, the application loads accessible experiments using the personal API key held in the server session. The authenticated `GET /experiments` route retrieves all pages from eLabFTW with `scope=3` (all accessible experiments of the user). Options show the title, owner (when available), and ID. Use **Refresh experiments** to reload the list or retry a failed request.
