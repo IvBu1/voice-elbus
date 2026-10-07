@@ -20,19 +20,30 @@ const workflow = document.getElementById("workflow");
 
 let mediaRecorder;
 let audioStream;
-let audioChunks = [];
 let latestAudioBlob = null;
 let latestAudioUrl = null;
 let verifiedExperimentId = null;
 let verifiedExperimentTitle = null;
 let isAuthenticated = false;
 let experimentsRequestVersion = 0;
+let noteVersion = 0;
+let isRecording = false;
+let isTranscribing = false;
+let isSending = false;
+
+function updateNoteControls(){
+    const busy = isRecording || isTranscribing || isSending;
+    recordButton.disabled = !isAuthenticated || busy;
+    transcript.disabled = !isAuthenticated || busy;
+    transcribeButton.disabled = !isAuthenticated || busy || latestAudioBlob === null;
+    updateSendButtonState();
+}
 
 // +++++++ state management +++++++
 function updateSendButtonState(){
     const hasExperiment = verifiedExperimentId !== null;
     const hasTranscript = transcript.value.trim() !== "";
-    sendButton.disabled = !isAuthenticated || !(hasExperiment && hasTranscript);
+    sendButton.disabled = !isAuthenticated || isRecording || isTranscribing || isSending || !(hasExperiment && hasTranscript);
 }
 
 function setAuthenticated(authenticated){
@@ -67,7 +78,7 @@ function setAuthenticated(authenticated){
         sendButton.disabled = true;
     }
 
-    updateSendButtonState();
+    updateNoteControls();
 }
 
 function disableWorkflowControls(){
@@ -82,11 +93,7 @@ function disableWorkflowControls(){
 
 function resetFormAfterSend() {
     transcript.value = "";
-    experimentIdInput.value = "";
-    verifiedExperimentId = null;
-    verifiedExperimentTitle = null;
-    experimentInfo.textContent = "No experiment selected.";
-    clearRecording()   
+    clearRecording();
     recordButton.disabled = !isAuthenticated;
     stopButton.disabled = true;
     sendButton.disabled = true;
@@ -228,8 +235,11 @@ logoutButton.addEventListener("click", async function(){
 
 // +++++++ audio +++++++
 function clearRecording(){
+    noteVersion++;
+    isRecording = false;
+    isTranscribing = false;
+    isSending = false;
     latestAudioBlob = null;
-    audioChunks = [];
 
     if(latestAudioUrl !== null){
         URL.revokeObjectURL(latestAudioUrl);
@@ -241,6 +251,7 @@ function clearRecording(){
     audioPlayer.load();
     audioPlayer.hidden = true;
     transcribeButton.disabled = true;
+    transcribeButton.hidden = true;
 }
 
 function getFileExtension(){
@@ -254,101 +265,104 @@ function getFileExtension(){
 }
 
 recordButton.addEventListener("click", async function (){
-    try {
-        clearRecording();
-        audioStream = await navigator.mediaDevices.getUserMedia({audio: true});
+    if(!isAuthenticated || isRecording || isTranscribing || isSending)
+        return;
+    clearRecording();
+    transcript.value = "";
+    isRecording = true;
+    const version = noteVersion;
+    updateNoteControls();
+    status.textContent = "Opening microphone...";
 
-        if(!isAuthenticated){
-            audioStream.getTracks().forEach(function (track){
-                track.stop();
-            });
-            audioStream = null;
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+        if(!isAuthenticated || version !== noteVersion){
+            stream.getTracks().forEach(track => track.stop());
             return;
         }
+        audioStream = stream;
+        const recorder = new MediaRecorder(stream);
+        const chunks = [];
+        mediaRecorder = recorder;
 
-        mediaRecorder = new MediaRecorder(audioStream);
-        audioChunks = [];
-
-        mediaRecorder.addEventListener("dataavailable", function (event){
-                audioChunks.push(event.data);
-        });
-
-        mediaRecorder.addEventListener("stop", function (){
-            if(!isAuthenticated){
-                clearRecording();
+        recorder.addEventListener("dataavailable", event => chunks.push(event.data));
+        recorder.addEventListener("stop", function (){
+            stream.getTracks().forEach(track => track.stop());
+            if(!isAuthenticated || version !== noteVersion)
                 return;
-            }
-
-            latestAudioBlob = new Blob(audioChunks, {type: mediaRecorder.mimeType});
-
-            if(latestAudioUrl !== null){
-                URL.revokeObjectURL(latestAudioUrl);
-            }
+            audioStream = null;
+            isRecording = false;
+            stopButton.disabled = true;
+            latestAudioBlob = new Blob(chunks, {type: recorder.mimeType});
             latestAudioUrl = URL.createObjectURL(latestAudioBlob);
             audioPlayer.src = latestAudioUrl;
-
             audioPlayer.hidden = false;
-            transcribeButton.disabled = false;
-            status.textContent = "Recording ready.";
+            transcribeRecording();
         });
 
-        mediaRecorder.start();
-
-        recordButton.disabled = true;
+        recorder.start();
         stopButton.disabled = false;
-
         status.textContent = "Recording...";
-    }
-    catch(error){
+    } catch(error){
+        if(version !== noteVersion || !isAuthenticated)
+            return;
+        if(audioStream){
+            audioStream.getTracks().forEach(track => track.stop());
+            audioStream = null;
+        }
+        isRecording = false;
+        updateNoteControls();
         status.textContent = "Could not access microphone.";
         console.error(error);
     }
 });
 
 stopButton.addEventListener("click", function (){
-        mediaRecorder.stop();
-        audioStream.getTracks().forEach(function (track){
-            track.stop();
-        });
-
-        recordButton.disabled = !isAuthenticated;
-        stopButton.disabled = true;
-
-        status.textContent = "Recording stopped.";
+    if(!mediaRecorder || mediaRecorder.state !== "recording")
+        return;
+    stopButton.disabled = true;
+    status.textContent = "Preparing recording...";
+    mediaRecorder.stop();
 });
 // ------- audio -------
 
 
 // +++++++ transcription +++++++
 async function transcribeRecording(){
-    if(latestAudioBlob === null){
-        status.textContent = "No recording available.";
+    if(!isAuthenticated || isRecording || isTranscribing || isSending || latestAudioBlob === null)
         return;
-    }
 
+    const version = noteVersion;
+    isTranscribing = true;
+    transcribeButton.hidden = true;
+    updateNoteControls();
     const formData = new FormData();
-    const extension = getFileExtension();
-
-    formData.append("file", latestAudioBlob, "recording." + extension); // exactly "file" is requested by our FastAPI function
+    formData.append("file", latestAudioBlob, "recording." + getFileExtension());
     status.textContent = "Uploading and transcribing...";
 
     try {
         const response = await authenticatedFetch("transcribe", {method: "POST", body: formData});
-
-        if(!response.ok){
-            const errorResult = await response.json();
-            throw new Error(errorResult.detail || ("Server returned " + response.status));
-        }
-
+        if(!response.ok)
+            throw new Error(await getErrorMessage(response, "Could not transcribe recording."));
         const result = await response.json();
+        if(version !== noteVersion || !isAuthenticated)
+            return;
         transcript.value = result.text;
-        updateSendButtonState();
-        status.textContent = "Transcription complete.";
-    }
-    catch(error){
+        status.textContent = result.text.trim()
+            ? "Transcription complete. Review your note before sending."
+            : "No speech detected. You can retry transcription or record again.";
+        transcribeButton.hidden = result.text.trim() !== "";
+    } catch(error){
+        if(version !== noteVersion || !isAuthenticated)
+            return;
         status.textContent = "Transcription failed: " + error.message;
+        transcribeButton.hidden = false;
         console.error(error);
-        transcribeButton.disabled = !isAuthenticated || latestAudioBlob === null;
+    } finally{
+        if(version === noteVersion){
+            isTranscribing = false;
+            updateNoteControls();
+        }
     }
 }
 
@@ -375,6 +389,8 @@ async function getErrorMessage(response, fallbackMessage){
 
 // +++++++ ELBUS submission +++++++
 async function sendToElbus(){
+    if(!isAuthenticated || isRecording || isTranscribing || isSending)
+        return;
     if(verifiedExperimentId === null){
         status.textContent = "Please select an experiment first.";
         return;
@@ -392,8 +408,10 @@ async function sendToElbus(){
         return;
     }
 
+    const version = noteVersion;
+    isSending = true;
+    updateNoteControls();
     status.textContent = "Sending transcript to ELBUS...";
-    sendButton.disabled = true;
 
     try {
         const response = await authenticatedFetch("append", {
@@ -407,12 +425,18 @@ async function sendToElbus(){
             throw new Error(errorResult.detail || ("Server returned "+ response.status));
         }
 
-        resetFormAfterSend();
+        if(version === noteVersion && isAuthenticated)
+            resetFormAfterSend();
     }
     catch(error){
-        status.textContent = "Could not add transcript: " + error.message;
-        console.error(error);
-        updateSendButtonState();
+        if(version === noteVersion && isAuthenticated){
+            status.textContent = "Could not add transcript: " + error.message;
+            console.error(error);
+        }
+    } finally{
+        if(version === noteVersion)
+            isSending = false;
+        updateNoteControls();
     }
 }
 

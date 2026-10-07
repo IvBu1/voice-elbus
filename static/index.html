@@ -34,20 +34,17 @@
 
         <div id="workflow" hidden>
             <section class="card">
-                <h2>1. Record</h2>
+                <h2>1. Record and review</h2>
+                <p>Press Stop to transcribe automatically, then review your note.</p>
                 <div class="button-row">
                     <button id="recordButton" class="button primary">Start recording</button>
                     <button id="stopButton" class="button secondary" disabled>Stop</button>
                 </div>
 
-                <p id="status" class="status">Ready.</p>
+                <p id="status" class="status" role="status">Ready.</p>
 
                 <audio id="audioPlayer" controls hidden></audio>
-            </section>
-
-            <section class="card">
-                <h2>2. Transcribe</h2>
-                <button id="transcribeButton" class="button primary" disabled>Transcribe recording</button>
+                <button id="transcribeButton" class="button secondary" disabled hidden>Retry transcription</button>
                 <label for="transcript">Transcript</label>
                 <textarea
                     id="transcript"
@@ -57,7 +54,7 @@
             </section>
 
             <section class="card">
-                <h2>3. Select experiment</h2>
+                <h2>2. Select experiment</h2>
                 <label for="experimentId">Accessible experiments</label>
                 <div class="experiment-row">
                     <select id="experimentId" disabled aria-describedby="experimentInfo">
@@ -71,7 +68,7 @@
             </section>
 
             <section class="card send-card">
-                <h2>4. Send</h2>
+                <h2>3. Send</h2>
                 <button id="sendButton" class="button success" disabled>Add transcript to ELBUS</button>
             </section>
         </div>

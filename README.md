@@ -5,7 +5,7 @@ A lightweight web application for adding speech-to-text laboratory notes to ELBU
 The application allows a user to:
 1) Authenticate via API key and start a session.
 2) Record a voice note in the browser.
-3) Transcribe the recording using OpenAI Whisper running on the server.
+3) Automatically transcribe after stopping the recording using OpenAI Whisper running on the server.
 4) Review and edit the generated transcript.
 5) Select an accessible ELBUS experiment from the dropdown.
 6) Append the approved transcript to the experiment using the eLabFTW REST API.
@@ -32,7 +32,7 @@ The application consists of a small browser frontend and a Python backend.
 
 ## Application workflow
 
-1) browser recording
+1) browser recording (Stop automatically starts transcription)
 2) temporary audio file upload
 3) `Whisper` transcription
 4) temporary audio file deleted
@@ -85,3 +85,5 @@ Deployment within University of Stuttgart infrastructure is currently being inve
 ## Experiment selection
 
 After connecting, the application loads accessible experiments using the personal API key held in the server session. The authenticated `GET /experiments` route retrieves all pages from eLabFTW with `scope=3` (all accessible experiments of the user). Options show the title, owner (when available), and ID. Use **Refresh experiments** to reload the list or retry a failed request.
+
+Recording and transcript review share one step, with audio playback and an editable transcript. During transcription, recording and sending are disabled. Failed transcription keeps the audio available and shows **Retry transcription**. Sending clears the note and recording while retaining the selected experiment for the next note.
