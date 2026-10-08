@@ -45,10 +45,18 @@ function updateNoteControls(){
     attachAudio.disabled = isActionDisabled || latestAudioBlob === null;
     experimentIdInput.disabled = isActionDisabled || isLoadingExperiments || experimentIdInput.options.length <= 1;
     refreshExperimentsButton.disabled = isActionDisabled || isLoadingExperiments;
-    sendButton.textContent = pendingSubmission
-        ? (pendingSubmission.transcriptSaved ? "Retry audio upload" : "Retry sending voice note")
-        : "Add transcript to ELBUS";
-    continueWithoutAudioButton.hidden = !pendingSubmission?.transcriptSaved || busy;
+    if(!pendingSubmission){
+        sendButton.textContent = "Add transcript to ELBUS";
+    } else if(pendingSubmission.transcriptSaved){
+        sendButton.textContent = "Retry audio upload";
+    } else {
+        sendButton.textContent = "Retry sending voice note";
+    }
+    if(pendingSubmission !== null && pendingSubmission.transcriptSaved && !busy){
+        continueWithoutAudioButton.hidden = false;
+    } else {
+        continueWithoutAudioButton.hidden = true;
+    }
     continueWithoutAudioButton.disabled = !isAuthenticated || busy;
     updateSendButtonState();
 }
@@ -370,9 +378,11 @@ async function transcribeRecording(){
         if(version !== noteVersion || !isAuthenticated)
             return;
         transcript.value = result.text;
-        status.textContent = result.text.trim()
-            ? "Transcription complete. Review your note before sending."
-            : "No speech detected. You can retry transcription or record again.";
+        if(result.text.trim()){
+            status.textContent = "Transcription complete. Review your note before sending.";
+        } else {
+            status.textContent = "No speech detected. You can retry transcription or record again.";
+        }
         transcribeButton.hidden = result.text.trim() !== "";
     } catch(error){
         if(version !== noteVersion || !isAuthenticated)
@@ -428,19 +438,27 @@ async function sendToElbus(){
             status.textContent = "The audio exceeds 50 MB. Uncheck Attach original audio to send only the transcript.";
             return;
         }
-        const confirmed = window.confirm('Add this voice note' + (includeAudio ? ' and its original audio' : '')
-            + ' to "' + verifiedExperimentTitle + '" (ID ' + verifiedExperimentId + ')?');
+        let confirmationMessage = 'Add this voice note';
+        if(includeAudio){
+            confirmationMessage += ' and its original audio';
+        }
+        confirmationMessage += ' to "' + verifiedExperimentTitle + '" (ID ' + verifiedExperimentId + ')?';
+        const confirmed = window.confirm(confirmationMessage);
         if(!confirmed){
             status.textContent = "Send cancelled.";
             return;
+        }
+        let audioType;
+        if(includeAudio){
+            audioType = latestAudioBlob.type.split(";")[0].toLowerCase() || "application/octet-stream";
+        } else {
+            audioType = null;
         }
         pendingSubmission = {
             submission_id: crypto.randomUUID(),
             experiment_id: verifiedExperimentId,
             text,
-            audio_type: includeAudio
-                ? (latestAudioBlob.type.split(";")[0].toLowerCase() || "application/octet-stream")
-                : null,
+            audio_type: audioType,
             transcriptSaved: false
         };
     }
@@ -480,14 +498,19 @@ async function sendToElbus(){
         }
         if(version === noteVersion && isAuthenticated){
             resetFormAfterSend();
-            status.textContent = (submission.audio_type ? "Voice note and original audio added to ELBUS. " : "Voice note added to ELBUS. ")
-                + "Ready for a new recording.";
+            if(submission.audio_type){
+                status.textContent = "Voice note and original audio added to ELBUS. Ready for a new recording.";
+            } else {
+                status.textContent = "Voice note added to ELBUS. Ready for a new recording.";
+            }
         }
     } catch(error){
         if(version === noteVersion && isAuthenticated){
-            status.textContent = submission.transcriptSaved
-                ? "The transcript is saved. " + error.message + " Retry the audio upload or continue without audio."
-                : error.message + " Retry sending to confirm the result without duplicating the note.";
+            if(submission.transcriptSaved){
+                status.textContent = "The transcript is saved. " + error.message + " Retry the audio upload or continue without audio.";
+            } else {
+                status.textContent = error.message + " Retry sending to confirm the result without duplicating the note.";
+            }
             console.error(error);
         }
     } finally{
@@ -499,7 +522,7 @@ async function sendToElbus(){
 
 sendButton.addEventListener("click", sendToElbus);
 continueWithoutAudioButton.addEventListener("click", function(){
-    if(!isAuthenticated || isSending || !pendingSubmission?.transcriptSaved)
+    if(!isAuthenticated || isSending || pendingSubmission === null || !pendingSubmission.transcriptSaved)
         return;
     resetFormAfterSend();
     updateNoteControls();
@@ -531,11 +554,18 @@ async function loadExperiments(){
         if(requestVersion !== experimentsRequestVersion || !isAuthenticated)
             return;
 
-        experimentIdInput.replaceChildren(new Option(
-            result.experiments.length ? "Select an experiment" : "No accessible experiments", ""
-        ));
+        let placeholder;
+        if(result.experiments.length){
+            placeholder = "Select an experiment";
+        } else {
+            placeholder = "No accessible experiments";
+        }
+        experimentIdInput.replaceChildren(new Option(placeholder, ""));
         for(const experiment of result.experiments){
-            const title = experiment.title + (experiment.fullname ? " by " + experiment.fullname : "");
+            let title = experiment.title;
+            if(experiment.fullname){
+                title += " by " + experiment.fullname;
+            }
             const option = new Option(title + " (ID " + experiment.id + ")", String(experiment.id));
             option.dataset.title = title;
             experimentIdInput.add(option);
@@ -561,11 +591,15 @@ async function loadExperiments(){
 
 function selectExperiment(){
     const option = experimentIdInput.selectedOptions[0];
-    verifiedExperimentId = option && option.value ? Number(option.value) : null;
-    verifiedExperimentTitle = verifiedExperimentId !== null ? option.dataset.title : null;
-    experimentInfo.textContent = verifiedExperimentId !== null
-        ? 'Selected experiment: "' + verifiedExperimentTitle + '" (ID ' + verifiedExperimentId + ')'
-        : "No experiment selected.";
+    if(option && option.value){
+        verifiedExperimentId = Number(option.value);
+        verifiedExperimentTitle = option.dataset.title;
+        experimentInfo.textContent = 'Selected experiment: "' + verifiedExperimentTitle + '" (ID ' + verifiedExperimentId + ')';
+    } else {
+        verifiedExperimentId = null;
+        verifiedExperimentTitle = null;
+        experimentInfo.textContent = "No experiment selected.";
+    }
     updateSendButtonState();
 }
 
