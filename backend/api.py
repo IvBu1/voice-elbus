@@ -139,7 +139,8 @@ def create_app():
         with session.notes_lock:
             note = session.notes.get(submission_id)
             if note is None:
-                note = VoiceNote(request.experiment_id, request.text, request.audio_type)
+                note = VoiceNote(request.experiment_id, request.text, request.audio_type,
+                                 submission_id=request.submission_id)
                 session.notes[submission_id] = note
             elif (note.experiment_id, note.text, note.audio_type) != (
                     request.experiment_id, request.text, request.audio_type):
