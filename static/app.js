@@ -318,7 +318,7 @@ recordButton.addEventListener("click", async function (){
             latestAudioUrl = URL.createObjectURL(latestAudioBlob);
             audioPlayer.src = latestAudioUrl;
             audioPlayer.hidden = false;
-            audioSize.textContent = "(" + (latestAudioBlob.size / (1024 * 1024)).toFixed(2) + " MiB)";
+            audioSize.textContent = "(" + (latestAudioBlob.size / 1_000_000).toFixed(2) + " MB)";
             transcribeRecording();
         });
 
@@ -424,8 +424,8 @@ async function sendToElbus(){
             return;
         }
         const includeAudio = attachAudio.checked && latestAudioBlob !== null;
-        if(includeAudio && latestAudioBlob.size > 50 * 1024 * 1024){
-            status.textContent = "The audio exceeds 50 MiB. Uncheck Attach original audio to send only the transcript.";
+        if(includeAudio && latestAudioBlob.size > 50_000_000){
+            status.textContent = "The audio exceeds 50 MB. Uncheck Attach original audio to send only the transcript.";
             return;
         }
         const confirmed = window.confirm('Add this voice note' + (includeAudio ? ' and its original audio' : '')
