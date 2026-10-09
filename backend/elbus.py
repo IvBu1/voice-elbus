@@ -36,7 +36,7 @@ def get_experiments(api_key: str) -> list[dict]:
                 f"{BASE_URL}/experiments",
                 headers=get_headers(api_key),
                 params={"scope": 3, "limit": 100, "offset": offset,
-                        "order": "id", "sort": "asc"},
+                        "order": "lastchange", "sort": "desc"},
                 timeout=REQUEST_TIMEOUT,
             )
             response.raise_for_status()
