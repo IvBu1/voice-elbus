@@ -74,7 +74,8 @@
                     Attach original audio <span id="audioSize"></span>
                 </label>
                 <p>The audio is uploaded to ELBUS with the note. Maximum attachment size: 50 MB.</p>
-                <button id="sendButton" class="button success" disabled>Add transcript to ELBUS</button>
+                <p id="sendDestination" class="experiment-info send-destination" aria-live="polite">Select an experiment before sending.</p>
+                <button id="sendButton" class="button success" aria-describedby="sendDestination" disabled>Add voice note</button>
                 <button id="continueWithoutAudioButton" class="button secondary" hidden>Continue without audio</button>
             </section>
         </div>

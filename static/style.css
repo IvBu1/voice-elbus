@@ -330,3 +330,8 @@ audio {
         width: 100%;
     }
 }
+
+.send-destination {
+    margin-bottom: 12px;
+    font-weight: 600;
+}
