@@ -1,3 +1,4 @@
+import os
 import requests
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -6,7 +7,7 @@ from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 from html import escape, unescape
 
-BASE_URL = "https://elbustest.uni-stuttgart.de/api/v2"
+BASE_URL = os.environ["ELBUS_BASE_URL"].rstrip("/")
 VOICE_NOTE_TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M"
 REQUEST_TIMEOUT = (5, 15) # first number refers to connection timeout, second to data timeout
 

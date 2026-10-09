@@ -1,3 +1,4 @@
+import os
 import secrets
 import shutil
 import tempfile
@@ -22,6 +23,7 @@ from backend.transcription import transcribe_audio
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
+COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").strip().lower() == "true"
 
 @dataclass
 class Session:
@@ -226,7 +228,7 @@ def create_app():
             key="voice_elbus_session",
             value=session_id,
             httponly=True,
-            secure=False, # TODO: change to `TRUE` when using HTTPS protocol
+            secure=COOKIE_SECURE,
             samesite="lax"
         )
 
@@ -240,7 +242,7 @@ def create_app():
                voice_elbus_session: str | None = Cookie(default=None)):
         if voice_elbus_session:
             sessions.pop(voice_elbus_session, None)
-        response.delete_cookie("voice_elbus_session")
+        response.delete_cookie("voice_elbus_session", secure=COOKIE_SECURE, httponly=True, samesite="lax")
 
         return {"ok": True}
 
