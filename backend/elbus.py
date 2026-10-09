@@ -72,7 +72,7 @@ def format_voice_note(transcript: str, created_at: datetime | None = None,
     # Text-only notes need an invisible identifier for lost-response reconciliation.
     retry_marker = (f"<!-- voice-note-id{submission_id} -->"
                     if submission_id is not None and not audio_filename else "")
-    audio_reference = (f"<br><small>Original audio: {escape(audio_filename)}</small>"
+    audio_reference = (f'<br><span style="font-size: 0.7em;"><em>Original audio: {escape(audio_filename)}</em></span>'
                        if audio_filename else "")
     formatted_transcript = f"""
     {retry_marker}<p>
