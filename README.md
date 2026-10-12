@@ -90,7 +90,7 @@ Recording and transcript review share one step, with audio playback and an edita
 
 ## Original audio attachments
 
-**Attach original audio** is enabled by default. The recording size is displayed before sending, and the confirmation includes the audio when selected. Uncheck this option to send only the transcript. Attachments have a 50 MiB limit.
+**Attach original audio** is enabled by default. The recording size is displayed before sending, and the confirmation includes the audio when selected. Uncheck this option to send only the transcript. Attachments have a 25 MiB limit.
 
 The note header, audio filename, and attachment comment share a timestamp generated at submission time in Europe/Berlin. The note also names the matching audio file. For example, `Voice note — 2026-10-07 15:42:08.123456` corresponds to `voice-note-2026-10-07_15-42-08.123456.webm`.
 

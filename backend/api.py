@@ -45,7 +45,7 @@ class VoiceNoteRequest(AppendRequest):
     submission_id: UUID
     audio_type: str | None = None
 
-MAX_ATTACHMENT_BYTES = 50_000_000
+MAX_ATTACHMENT_BYTES = 25_000_000
 
 def get_audio_suffix(content_type: str | None) -> str:
     if not content_type:
@@ -169,7 +169,7 @@ def create_app():
         audio = bytearray()
         async for chunk in request.stream():
             if len(audio) + len(chunk) > MAX_ATTACHMENT_BYTES:
-                raise HTTPException(status_code=413, detail="Audio attachments must be no larger than 50 MB.")
+                raise HTTPException(status_code=413, detail="Audio attachments must be no larger than 25 MB.")
             audio.extend(chunk)
         if not audio:
             raise HTTPException(status_code=400, detail="The audio recording is empty.")
