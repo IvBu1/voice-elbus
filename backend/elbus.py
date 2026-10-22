@@ -7,7 +7,12 @@ from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 from html import escape, unescape
 
-BASE_URL = os.environ["ELBUS_BASE_URL"].rstrip("/")
+BASE_URL = os.environ["ELABFTW_BASE_URL"].strip().rstrip("/")
+if not BASE_URL:
+    raise ValueError("ELABFTW_BASE_URL must not be empty.")
+INSTANCE_NAME = os.environ["ELABFTW_INSTANCE_NAME"].strip()
+if not INSTANCE_NAME:
+    raise ValueError("ELABFTW_INSTANCE_NAME must not be empty.")
 VOICE_NOTE_TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M"
 REQUEST_TIMEOUT = (5, 15) # first number refers to connection timeout, second to data timeout
 
@@ -42,7 +47,7 @@ def get_experiments(api_key: str) -> list[dict]:
             response.raise_for_status()
             page = response.json()
             if not isinstance(page, list):
-                raise RuntimeError("ELBUS returned an invalid experiment list.")
+                raise RuntimeError(f"{INSTANCE_NAME} returned an invalid experiment list.")
             if not page:
                 break
             for experiment in page:
@@ -54,9 +59,9 @@ def get_experiments(api_key: str) -> list[dict]:
                 }
             offset += len(page)
     except requests.exceptions.Timeout:
-        raise RuntimeError("ELBUS request timed out.")
+        raise RuntimeError(f"{INSTANCE_NAME} request timed out.")
     except requests.exceptions.ConnectionError:
-        raise RuntimeError("ELBUS cannot be reached from this network.")
+        raise RuntimeError(f"{INSTANCE_NAME} cannot be reached from this network.")
     return list(experiments.values())
 
 
@@ -101,9 +106,9 @@ def append_voice_note(experiment_id: int,
 		)
 		response.raise_for_status()
 	except requests.exceptions.Timeout:
-		raise RuntimeError("ELBUS request timed out.")
+		raise RuntimeError(f"{INSTANCE_NAME} request timed out.")
 	except requests.exceptions.ConnectionError:
-		raise RuntimeError("ELBUS cannot be reached from this network.")
+		raise RuntimeError(f"{INSTANCE_NAME} cannot be reached from this network.")
 
 
 def get_experiment_title(experiment_id: int,
@@ -121,9 +126,9 @@ def get_experiment_title(experiment_id: int,
 		title_and_name = f"{experiment['title']} by {experiment['fullname']}"
 		return title_and_name
 	except requests.exceptions.Timeout:
-		raise RuntimeError("ELBUS request timed out.")
+		raise RuntimeError(f"{INSTANCE_NAME} request timed out.")
 	except requests.exceptions.ConnectionError:
-		raise RuntimeError("ELBUS cannot be reached from this network.")
+		raise RuntimeError(f"{INSTANCE_NAME} cannot be reached from this network.")
 
 
 def validate_api_key(api_key: str) -> bool:
@@ -142,9 +147,9 @@ def validate_api_key(api_key: str) -> bool:
         response.raise_for_status()
         return True
     except requests.exceptions.Timeout:
-        raise RuntimeError("ELBUS request timed out.")
+        raise RuntimeError(f"{INSTANCE_NAME} request timed out.")
     except requests.exceptions.ConnectionError:
-        raise RuntimeError("ELBUS cannot be reached from this network.")
+        raise RuntimeError(f"{INSTANCE_NAME} cannot be reached from this network.")
 
 
 @dataclass
@@ -191,9 +196,7 @@ class VoiceNote:
                     self.transcript_saved = True
                     return
                 if self.append_response_uncertain and self.audio_type is None:
-                    # ELBUS may strip HTML comments. Do not repeat an uncertain
-                    # text-only write when its invisible marker cannot be found.
-                    raise RuntimeError("Check ELBUS before resubmitting this text-only note.")
+                    raise RuntimeError(f"Check {INSTANCE_NAME} before resubmitting this text-only note.")
             self.append_attempted = True
             try:
                 append_voice_note(self.experiment_id, self.text, api_key,

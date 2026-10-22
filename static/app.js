@@ -1,3 +1,5 @@
+const instanceName = document.body.dataset.instanceName;
+
 const recordButton = document.getElementById("recordButton");
 const stopButton = document.getElementById("stopButton");
 const status = document.getElementById("status");
@@ -83,7 +85,7 @@ function setAuthenticated(authenticated){
     workflow.hidden = !authenticated;
 
     if(authenticated){
-        loginStatus.textContent = "Connected to ELBUS.";
+        loginStatus.textContent = "Connected to " + instanceName + ".";
         apiKeyInput.disabled = true;
         loginButton.hidden = true;
         logoutButton.hidden = false;
@@ -97,7 +99,7 @@ function setAuthenticated(authenticated){
         experimentIdInput.replaceChildren(new Option("Connect to load experiments", ""));
         verifiedExperimentId = null;
         verifiedExperimentTitle = null;
-        loginStatus.textContent = "Not connected to ELBUS.";
+        loginStatus.textContent = "Not connected to " + instanceName + ".";
         apiKeyInput.disabled = false;
         loginButton.hidden = false;
         logoutButton.hidden = true;
@@ -131,7 +133,7 @@ function resetFormAfterSend() {
     recordButton.disabled = !isAuthenticated;
     stopButton.disabled = true;
     sendButton.disabled = true;
-    status.textContent = "Voice note added to ELBUS. " + "Ready for a new recording.";
+    status.textContent = "Voice note added to " + instanceName + ". " + "Ready for a new recording.";
 }
 
 function resetWorkflow(){
@@ -162,7 +164,7 @@ async function authenticatedFetch(url, options={}){
     if(response.status === 401){
         resetWorkflow();
         setAuthenticated(false);
-        const message = "Your ELBUS session has expired. Please connect again.";
+        const message = "Your " + instanceName + " session has expired. Please connect again.";
         loginStatus.textContent = message;
         throw new Error(message);
     }
@@ -187,9 +189,9 @@ async function checkAuthentication(){
             await loadExperiments();
         }
         else{
-            status.textContent = "Connect to ELBUS to begin.";
+            status.textContent = "Connect to " + instanceName + " to begin.";
             if(result.reason === "Session expired.")
-                loginStatus.textContent = "Your ELBUS session has expired. Please connect again.";
+                loginStatus.textContent = "Your " + instanceName + " session has expired. Please connect again.";
         }
     } catch{
         setAuthenticated(false);
@@ -201,13 +203,13 @@ loginButton.addEventListener("click", async function(){
         const apiKey = apiKeyInput.value.trim();
 
         if(!apiKey){
-            loginStatus.textContent = "Please enter an ELBUS API key.";
+            loginStatus.textContent = "Please enter your " + instanceName + " API key.";
             return;
         }
 
         loginButton.disabled = true;
         apiKeyInput.disabled = true;
-        loginStatus.textContent = "Connecting to ELBUS...";
+        loginStatus.textContent = "Connecting to " + instanceName + "...";
 
         try {
             const response = await fetch("auth/login", {
@@ -218,7 +220,7 @@ loginButton.addEventListener("click", async function(){
             });
 
             if(!response.ok){
-                const message = await getErrorMessage(response, "Could not connect to ELBUS.");
+                const message = await getErrorMessage(response, "Could not connect to " + instanceName + ".");
                 throw new Error(message);
             }
 
@@ -248,7 +250,7 @@ logoutButton.addEventListener("click", async function(){
         isAuthenticated = false;
         logoutButton.disabled = true;
         disableWorkflowControls();
-        loginStatus.textContent = "Disconnecting from ELBUS...";
+        loginStatus.textContent = "Disconnecting from " + instanceName + "...";
 
         try {
             await fetch("auth/logout", {
@@ -259,7 +261,7 @@ logoutButton.addEventListener("click", async function(){
             resetWorkflow();
             setAuthenticated(false);
             apiKeyInput.value = "";
-            status.textContent = "Connect to ELBUS to begin.";
+            status.textContent = "Connect to " + instanceName + " to begin.";
             logoutButton.disabled = false;
         }
     }
@@ -468,7 +470,7 @@ async function sendToElbus(){
 
     try {
         if(!submission.transcriptSaved){
-            status.textContent = "Sending transcript to ELBUS...";
+            status.textContent = "Sending transcript to " + instanceName + "...";
             const response = await authenticatedFetch("voice-notes", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
@@ -486,7 +488,7 @@ async function sendToElbus(){
             submission.transcriptSaved = true;
         }
         if(submission.audio_type){
-            status.textContent = "Transcript saved. Uploading original audio to ELBUS...";
+            status.textContent = "Transcript saved. Uploading original audio to " + instanceName + "...";
             const response = await authenticatedFetch("voice-notes/" + submission.submission_id + "/audio", {
                 method: "POST",
                 headers: {"Content-Type": submission.audio_type},
@@ -526,7 +528,7 @@ continueWithoutAudioButton.addEventListener("click", function(){
         return;
     resetFormAfterSend();
     updateNoteControls();
-    status.textContent = "The transcript is saved. Audio attachment was not confirmed; check ELBUS before uploading it manually. Ready for a new recording.";
+    status.textContent = "The transcript is saved. Audio attachment was not confirmed. Check " + instanceName + " before uploading it manually. Ready for a new recording.";
 });
 // ------- ELBUS submission -------
 

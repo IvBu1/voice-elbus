@@ -5,19 +5,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>ELBUS Voice Notes</title>
+    <title>eLab Voice ({{INSTANCE_NAME}})</title>
 
     <link rel="stylesheet" href="static/style.css">
     <link rel="icon" href="/favicon.ico">
 </head>
 
 
-<body>
+<body data-instance-name="{{INSTANCE_NAME}}">
     <main class="app">
         <header class="app-header">
             <div>
-                <h1>ELBUS Voice Notes</h1>
-                <p>Record a laboratory note, review the transcription, and add it to ELBUS.</p>
+                <h1>eLab Voice ({{INSTANCE_NAME}})</h1>
+                <p>Record a laboratory note, review the transcription, and add it to {{INSTANCE_NAME}}.</p>
             </div>
             <button id="logoutButton" class="button danger logout-button" hidden>
                 Disconnect
@@ -25,16 +25,16 @@
         </header>
 
         <section class="card login-card" id="loginSection">
-            <h2>Connect to ELBUS</h2>
-            <label for="apiKey">ELBUS API key (with write permissions)</label>
-            <input id="apiKey" type="password" autocomplete="off" placeholder="Enter your ELBUS API key">
+            <h2>Connect to {{INSTANCE_NAME}}</h2>
+            <label for="apiKey">{{INSTANCE_NAME}} API key (with write permissions)</label>
+            <input id="apiKey" type="password" autocomplete="off" placeholder="Enter your {{INSTANCE_NAME}} API key">
             <details class="api-key-help">
                 <summary>Need help generating an API key?</summary>
-                <p>Create an API key in your ELBUS account under <strong>Settings → API keys</strong> and enable <strong>write access</strong>.
+                <p>Create an API key in your {{INSTANCE_NAME}} account under <strong>Settings → API keys</strong> and enable <strong>write access</strong>.
                     <a href="https://doc.elabftw.net/docs/usage/api/#generating-a-key" target="_blank" rel="noopener noreferrer">How to create an API key</a>
                 </p>
             </details>
-            <button id="loginButton" class="button primary">Connect to ELBUS</button>
+            <button id="loginButton" class="button primary">Connect to {{INSTANCE_NAME}}</button>
             <p id="loginStatus" class="status">Not connected.</p>
         </section>
 
@@ -79,7 +79,7 @@
                     <input id="attachAudio" type="checkbox" checked disabled>
                     Attach original audio <span id="audioSize"></span>
                 </label>
-                <p>The audio is uploaded to ELBUS with the note. Maximum attachment size: 50 MB.</p>
+                <p>The audio is uploaded to {{INSTANCE_NAME}} with the note. Maximum attachment size: 50 MB.</p>
                 <p id="sendDestination" class="experiment-info send-destination" aria-live="polite">Select an experiment before sending.</p>
                 <button id="sendButton" class="button success" aria-describedby="sendDestination" disabled>Add voice note</button>
                 <button id="continueWithoutAudioButton" class="button secondary" hidden>Continue without audio</button>
@@ -88,7 +88,7 @@
 
     </main>
 
-    <script src="static/app.js"></script>
+    <script src="static/app.js?v=instance-name-1"></script>
 
 </body>
 

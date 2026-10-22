@@ -6,17 +6,18 @@ import traceback
 from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass, field
 from pathlib import Path
+from html import escape
 from threading import Lock
 from uuid import UUID
 from pydantic import BaseModel
 
 from fastapi import FastAPI, File, HTTPException, UploadFile, Cookie, Depends, Response, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
 from backend.elbus import (
-    AUDIO_EXTENSIONS, VoiceNote, append_voice_note,
+    AUDIO_EXTENSIONS, INSTANCE_NAME, VoiceNote, append_voice_note,
     get_experiment_title, get_experiments, validate_api_key,
 )
 from backend.transcription import transcribe_audio
@@ -93,7 +94,9 @@ def create_app():
     # web operation for displaying the website
     @app.get("/")
     def index():
-        return FileResponse(STATIC_DIR / "index.html")
+        html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+        html = html.replace("{{INSTANCE_NAME}}", escape(INSTANCE_NAME, quote=True))
+        return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
 
     # web operation for transcribing; we do not use api_key here but depending on it protects this function from being called if there is no valid session
@@ -126,7 +129,7 @@ def create_app():
         try:
             append_voice_note(request.experiment_id, request.text, api_key)
         except Exception as exc:
-            raise HTTPException(status_code=500, detail=(f"ELBUS request failed: {exc}"))
+            raise HTTPException(status_code=500, detail=(f"{INSTANCE_NAME} request failed: {exc}"))
         return {"ok": True}
 
 
@@ -219,7 +222,7 @@ def create_app():
             raise HTTPException(status_code=502, detail=str(exc)) # error code: bad gateway
 
         if not valid:
-            raise HTTPException(status_code=401, detail="Invalid ELBUS API key.") # error code: not authorized
+            raise HTTPException(status_code=401, detail=f"Invalid {INSTANCE_NAME} API key.") # error code: not authorized
 
         session_id = secrets.token_urlsafe(32)
         sessions[session_id] = Session(api_key=api_key, expires_at=(datetime.now(timezone.utc) + timedelta(hours=2)))
