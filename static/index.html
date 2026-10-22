@@ -28,6 +28,12 @@
             <h2>Connect to ELBUS</h2>
             <label for="apiKey">ELBUS API key (with write permissions)</label>
             <input id="apiKey" type="password" autocomplete="off" placeholder="Enter your ELBUS API key">
+            <details class="api-key-help">
+                <summary>Need help generating an API key?</summary>
+                <p>Create an API key in your ELBUS account under <strong>Settings → API keys</strong> and enable <strong>write access</strong>.
+                    <a href="https://doc.elabftw.net/docs/usage/api/#generating-a-key" target="_blank" rel="noopener noreferrer">How to create an API key</a>
+                </p>
+            </details>
             <button id="loginButton" class="button primary">Connect to ELBUS</button>
             <p id="loginStatus" class="status">Not connected.</p>
         </section>

@@ -335,3 +335,12 @@ audio {
     margin-bottom: 12px;
     font-weight: 600;
 }
+
+.api-key-help {
+    margin-top: 12px;
+    color: #52606d;
+}
+
+.api-key-help summary {
+    cursor: pointer;
+}
