@@ -85,7 +85,7 @@ function setAuthenticated(authenticated){
     workflow.hidden = !authenticated;
 
     if(authenticated){
-        loginStatus.textContent = "Connected to " + instanceName + ".";
+        setMessage(loginStatus, "Connected to " + instanceName + ".", "success");
         apiKeyInput.disabled = true;
         loginButton.hidden = true;
         logoutButton.hidden = false;
@@ -99,7 +99,7 @@ function setAuthenticated(authenticated){
         experimentIdInput.replaceChildren(new Option("Connect to load experiments", ""));
         verifiedExperimentId = null;
         verifiedExperimentTitle = null;
-        loginStatus.textContent = "Not connected to " + instanceName + ".";
+        setMessage(loginStatus, "Not connected to " + instanceName + ".", "neutral");
         apiKeyInput.disabled = false;
         loginButton.hidden = false;
         logoutButton.hidden = true;
@@ -133,7 +133,7 @@ function resetFormAfterSend() {
     recordButton.disabled = !isAuthenticated;
     stopButton.disabled = true;
     sendButton.disabled = true;
-    status.textContent = "Voice note added to " + instanceName + ". " + "Ready for a new recording.";
+    setMessage(status, "Voice note added to " + instanceName + ". " + "Ready for a new recording.", "success");
 }
 
 function resetWorkflow(){
@@ -141,7 +141,7 @@ function resetWorkflow(){
     experimentIdInput.value = "";
     verifiedExperimentId = null;
     verifiedExperimentTitle = null;
-    experimentInfo.textContent = "No experiment selected.";
+    setMessage(experimentInfo, "No experiment selected.", "neutral");
     if(audioStream){
         audioStream.getTracks().forEach(function (track){
             track.stop();
@@ -165,7 +165,7 @@ async function authenticatedFetch(url, options={}){
         resetWorkflow();
         setAuthenticated(false);
         const message = "Your " + instanceName + " session has expired. Please connect again.";
-        loginStatus.textContent = message;
+        setMessage(loginStatus, message, "error");
         throw new Error(message);
     }
 
@@ -185,17 +185,17 @@ async function checkAuthentication(){
         setAuthenticated(result.authenticated);
 
         if(result.authenticated){
-            status.textContent = "Ready.";
+            setMessage(status, "Ready.", "neutral");
             await loadExperiments();
         }
         else{
-            status.textContent = "Connect to " + instanceName + " to begin.";
+            setMessage(status, "Connect to " + instanceName + " to begin.", "neutral");
             if(result.reason === "Session expired.")
-                loginStatus.textContent = "Your " + instanceName + " session has expired. Please connect again.";
+                setMessage(loginStatus, "Your " + instanceName + " session has expired. Please connect again.", "error");
         }
     } catch{
         setAuthenticated(false);
-        loginStatus.textContent = "Could not contact the server.";
+        setMessage(loginStatus, "Could not contact the server.", "error");
     }
 }
 
@@ -203,13 +203,13 @@ loginButton.addEventListener("click", async function(){
         const apiKey = apiKeyInput.value.trim();
 
         if(!apiKey){
-            loginStatus.textContent = "Please enter your " + instanceName + " API key.";
+            setMessage(loginStatus, "Please enter your " + instanceName + " API key.", "error");
             return;
         }
 
         loginButton.disabled = true;
         apiKeyInput.disabled = true;
-        loginStatus.textContent = "Connecting to " + instanceName + "...";
+        setMessage(loginStatus, "Connecting to " + instanceName + "...", "neutral");
 
         try {
             const response = await fetch("auth/login", {
@@ -227,11 +227,11 @@ loginButton.addEventListener("click", async function(){
             // remove the API key from the input as soon as authentication succeeds
             apiKeyInput.value = "";
             setAuthenticated(true);
-            status.textContent = "Ready.";
+            setMessage(status, "Ready.", "neutral");
             await loadExperiments();
         } catch(error){
             setAuthenticated(false);
-            loginStatus.textContent = error.message;
+            setMessage(loginStatus, error.message, "error");
         } finally{
             loginButton.disabled = false;
             if(!isAuthenticated)
@@ -250,7 +250,7 @@ logoutButton.addEventListener("click", async function(){
         isAuthenticated = false;
         logoutButton.disabled = true;
         disableWorkflowControls();
-        loginStatus.textContent = "Disconnecting from " + instanceName + "...";
+        setMessage(loginStatus, "Disconnecting from " + instanceName + "...", "neutral");
 
         try {
             await fetch("auth/logout", {
@@ -261,7 +261,7 @@ logoutButton.addEventListener("click", async function(){
             resetWorkflow();
             setAuthenticated(false);
             apiKeyInput.value = "";
-            status.textContent = "Connect to " + instanceName + " to begin.";
+            setMessage(status, "Connect to " + instanceName + " to begin.", "neutral");
             logoutButton.disabled = false;
         }
     }
@@ -311,7 +311,7 @@ recordButton.addEventListener("click", async function (){
     isRecording = true;
     const version = noteVersion;
     updateNoteControls();
-    status.textContent = "Opening microphone...";
+    setMessage(status, "Opening microphone...", "neutral");
 
     try {
         const stream = await navigator.mediaDevices.getUserMedia({audio: true});
@@ -342,7 +342,7 @@ recordButton.addEventListener("click", async function (){
 
         recorder.start();
         stopButton.disabled = false;
-        status.textContent = "Recording...";
+        setMessage(status, "Recording...", "neutral");
     } catch(error){
         if(version !== noteVersion || !isAuthenticated)
             return;
@@ -352,7 +352,7 @@ recordButton.addEventListener("click", async function (){
         }
         isRecording = false;
         updateNoteControls();
-        status.textContent = "Could not access microphone.";
+        setMessage(status, "Could not access microphone.", "error");
         console.error(error);
     }
 });
@@ -361,7 +361,7 @@ stopButton.addEventListener("click", function (){
     if(!mediaRecorder || mediaRecorder.state !== "recording")
         return;
     stopButton.disabled = true;
-    status.textContent = "Preparing recording...";
+    setMessage(status, "Preparing recording...", "neutral");
     mediaRecorder.stop();
 });
 // ------- audio -------
@@ -378,7 +378,7 @@ async function transcribeRecording(){
     updateNoteControls();
     const formData = new FormData();
     formData.append("file", latestAudioBlob, "recording." + getFileExtension());
-    status.textContent = "Uploading and transcribing...";
+    setMessage(status, "Uploading and transcribing...", "neutral");
 
     try {
         const response = await authenticatedFetch("transcribe", {method: "POST", body: formData});
@@ -389,15 +389,15 @@ async function transcribeRecording(){
             return;
         transcript.value = result.text;
         if(result.text.trim()){
-            status.textContent = "Transcription complete. Review your note before sending.";
+            setMessage(status, "Transcription complete. Review your note before sending.", "success");
         } else {
-            status.textContent = "No speech detected. You can retry transcription or record again.";
+            setMessage(status, "No speech detected. You can retry transcription or record again.", "warning");
         }
         transcribeButton.hidden = result.text.trim() !== "";
     } catch(error){
         if(version !== noteVersion || !isAuthenticated)
             return;
-        status.textContent = "Transcription failed: " + error.message;
+        setMessage(status, "Transcription failed: " + error.message, "error");
         transcribeButton.hidden = false;
         console.error(error);
     } finally{
@@ -415,6 +415,11 @@ transcript.addEventListener("input", updateSendButtonState);
 
 
 // +++++++ helper functions +++++++
+function setMessage(element, message, state = "neutral"){
+    element.textContent = message;
+    element.dataset.state = state;
+}
+
 async function getErrorMessage(response, fallbackMessage){
     try{
         const data = await response.json();
@@ -435,17 +440,17 @@ async function sendToElbus(){
         return;
     if(!pendingSubmission){
         if(verifiedExperimentId === null){
-            status.textContent = "Please select an experiment first.";
+            setMessage(status, "Please select an experiment first.", "error");
             return;
         }
         const text = transcript.value.trim();
         if(!text){
-            status.textContent = "The transcript is empty.";
+            setMessage(status, "The transcript is empty.", "error");
             return;
         }
         const includeAudio = attachAudio.checked && latestAudioBlob !== null;
         if(includeAudio && latestAudioBlob.size > 50_000_000){
-            status.textContent = "The audio exceeds 50 MB. Uncheck Attach original audio to send only the transcript.";
+            setMessage(status, "The audio exceeds 50 MB. Uncheck Attach original audio to send only the transcript.", "error");
             return;
         }
         let audioType;
@@ -470,7 +475,7 @@ async function sendToElbus(){
 
     try {
         if(!submission.transcriptSaved){
-            status.textContent = "Sending transcript to " + instanceName + "...";
+            setMessage(status, "Sending transcript to " + instanceName + "...", "neutral");
             const response = await authenticatedFetch("voice-notes", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
@@ -488,7 +493,7 @@ async function sendToElbus(){
             submission.transcriptSaved = true;
         }
         if(submission.audio_type){
-            status.textContent = "Transcript saved. Uploading original audio to " + instanceName + "...";
+            setMessage(status, "Transcript saved. Uploading original audio to " + instanceName + "...", "neutral");
             const response = await authenticatedFetch("voice-notes/" + submission.submission_id + "/audio", {
                 method: "POST",
                 headers: {"Content-Type": submission.audio_type},
@@ -501,17 +506,17 @@ async function sendToElbus(){
             resetFormAfterSend();
             const destination = '"' + submission.experiment_title + '" (ID ' + submission.experiment_id + ')';
             if(submission.audio_type){
-                status.textContent = "Voice note and original audio added to " + destination + ". Ready for a new recording.";
+                setMessage(status, "Voice note and original audio added to " + destination + ". Ready for a new recording.", "success");
             } else {
-                status.textContent = "Voice note added to " + destination + ". Ready for a new recording.";
+                setMessage(status, "Voice note added to " + destination + ". Ready for a new recording.", "success");
             }
         }
     } catch(error){
         if(version === noteVersion && isAuthenticated){
             if(submission.transcriptSaved){
-                status.textContent = "The transcript is saved. " + error.message + " Retry the audio upload or continue without audio.";
+                setMessage(status, "The transcript is saved. " + error.message + " Retry the audio upload or continue without audio.", "warning");
             } else {
-                status.textContent = error.message + " Retry sending to confirm the result without duplicating the note.";
+                setMessage(status, error.message + " Retry sending to confirm the result without duplicating the note.", "error");
             }
             console.error(error);
         }
@@ -528,7 +533,7 @@ continueWithoutAudioButton.addEventListener("click", function(){
         return;
     resetFormAfterSend();
     updateNoteControls();
-    status.textContent = "The transcript is saved. Audio attachment was not confirmed. Check " + instanceName + " before uploading it manually. Ready for a new recording.";
+    setMessage(status, "The transcript is saved. Audio attachment was not confirmed. Check " + instanceName + " before uploading it manually. Ready for a new recording.", "warning");
 });
 // ------- ELBUS submission -------
 
@@ -545,7 +550,7 @@ async function loadExperiments(){
     experimentIdInput.replaceChildren(new Option("Loading experiments...", ""));
     experimentIdInput.disabled = true;
     refreshExperimentsButton.disabled = true;
-    experimentInfo.textContent = "Loading accessible experiments...";
+    setMessage(experimentInfo, "Loading accessible experiments...", "neutral");
     updateSendButtonState();
 
     try{
@@ -577,12 +582,12 @@ async function loadExperiments(){
             experimentIdInput.value = previousId;
         selectExperiment();
         if(!result.experiments.length)
-            experimentInfo.textContent = "No experiments are accessible with this API key.";
+            setMessage(experimentInfo, "No experiments are accessible with this API key.", "warning");
     } catch(error){
         if(requestVersion !== experimentsRequestVersion || !isAuthenticated)
             return;
         experimentIdInput.replaceChildren(new Option("Could not load experiments", ""));
-        experimentInfo.textContent = error.message + " Try refreshing the experiments.";
+        setMessage(experimentInfo, error.message + " Try refreshing the experiments.", "error");
     } finally{
         if(requestVersion === experimentsRequestVersion){
             isLoadingExperiments = false;
@@ -596,11 +601,11 @@ function selectExperiment(){
     if(option && option.value){
         verifiedExperimentId = Number(option.value);
         verifiedExperimentTitle = option.dataset.title;
-        experimentInfo.textContent = 'Selected experiment: "' + verifiedExperimentTitle + '" (ID ' + verifiedExperimentId + ')';
+        setMessage(experimentInfo, 'Selected experiment: "' + verifiedExperimentTitle + '" (ID ' + verifiedExperimentId + ')', "neutral");
     } else {
         verifiedExperimentId = null;
         verifiedExperimentTitle = null;
-        experimentInfo.textContent = "No experiment selected.";
+        setMessage(experimentInfo, "No experiment selected.", "neutral");
     }
     updateSendButtonState();
 }

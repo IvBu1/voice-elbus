@@ -261,6 +261,27 @@ input:focus {
     color: #52606d;
 }
 
+.status[data-state="error"],
+.experiment-info[data-state="error"] {
+    background: #fde8e8;
+    color: #9b1c1c;
+    border-left: 4px solid #c53030;
+}
+
+.status[data-state="warning"],
+.experiment-info[data-state="warning"] {
+    background: #fff4ce;
+    color: #754c00;
+    border-left: 4px solid #a66a00;
+}
+
+.status[data-state="success"],
+.experiment-info[data-state="success"] {
+    background: #e3f5e9;
+    color: #1b6135;
+    border-left: 4px solid #278348;
+}
+
 
 audio {
     width: 100%;
