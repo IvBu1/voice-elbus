@@ -1,4 +1,5 @@
 import os
+import re
 import secrets
 import shutil
 import tempfile
@@ -9,6 +10,7 @@ from pathlib import Path
 from html import escape
 from threading import Lock
 from uuid import UUID
+from urllib.parse import quote
 from pydantic import BaseModel
 
 from fastapi import FastAPI, File, HTTPException, UploadFile, Cookie, Depends, Response, Request
@@ -25,6 +27,26 @@ from backend.transcription import transcribe_audio
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").strip().lower() == "true"
+APP_VERSION = os.environ.get("APP_VERSION", "development").strip() or "development"
+APP_REVISION = os.environ.get("APP_REVISION", "").strip()
+APP_REPOSITORY_URL = os.environ.get("APP_REPOSITORY_URL", "").strip().rstrip("/")
+
+def render_version_info() -> str:
+    label = escape(APP_VERSION)
+    title = "Application version"
+    if APP_REVISION:
+        title += f"; commit {APP_REVISION[:7]}"
+    title = escape(title, quote=True)
+    if APP_REPOSITORY_URL.startswith("https://"):
+        if APP_VERSION != "development":
+            url = f"{APP_REPOSITORY_URL}/releases/tag/{quote(APP_VERSION, safe='')}"
+        elif APP_REVISION:
+            url = f"{APP_REPOSITORY_URL}/commit/{quote(APP_REVISION, safe='')}"
+        else:
+            url = APP_REPOSITORY_URL
+        return (f'<a href="{escape(url, quote=True)}" title="{title}" '
+                f'target="_blank" rel="noopener noreferrer">{label}</a>')
+    return f'<span title="{title}">{label}</span>'
 
 @dataclass
 class Session:
@@ -95,7 +117,10 @@ def create_app():
     @app.get("/")
     def index():
         html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
-        html = html.replace("{{INSTANCE_NAME}}", escape(INSTANCE_NAME, quote=True))
+        values = {"INSTANCE_NAME": escape(INSTANCE_NAME, quote=True),
+                  "VERSION_INFO": render_version_info()}
+        html = re.sub(r"\{\{(INSTANCE_NAME|VERSION_INFO)\}\}",
+                      lambda match: values[match.group(1)], html)
         return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
 

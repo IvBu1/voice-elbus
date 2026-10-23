@@ -16,6 +16,13 @@ COPY main.py .
 COPY backend ./backend
 COPY static ./static
 
+ARG APP_VERSION=development
+ARG APP_REVISION=
+ARG APP_REPOSITORY_URL=
+ENV APP_VERSION=${APP_VERSION} \
+    APP_REVISION=${APP_REVISION} \
+    APP_REPOSITORY_URL=${APP_REPOSITORY_URL}
+
 EXPOSE 8000
 
 CMD ["python3", "main.py"]

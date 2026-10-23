@@ -345,3 +345,14 @@ audio {
     cursor: pointer;
 }
 
+.app-footer {
+    margin-top: 24px;
+    text-align: right;
+    font-size: 0.85rem;
+    color: #52606d;
+}
+
+.app-footer a {
+    color: inherit;
+}
+
