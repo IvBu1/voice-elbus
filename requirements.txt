@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Ivan Buntic
+# SPDX-License-Identifier: MIT
+
 fastapi
 uvicorn[standard]
 python-multipart

@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Ivan Buntic
+ * SPDX-License-Identifier: MIT
+ */
+
 const instanceName = document.body.dataset.instanceName;
 
 const recordButton = document.getElementById("recordButton");

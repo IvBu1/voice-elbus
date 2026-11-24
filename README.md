@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 Ivan Buntic
+SPDX-License-Identifier: MIT
+-->
+
 # ELBUS Voice Notes
 
 A lightweight web application for adding speech-to-text laboratory notes to ELBUS/eLabFTW.

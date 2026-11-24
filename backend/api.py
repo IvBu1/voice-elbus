@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Ivan Buntic>
+# SPDX-License-Identifier: MIT
+
 import os
 import re
 import secrets
