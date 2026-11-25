@@ -59,6 +59,7 @@ class Session:
     notes_lock: Lock = field(default_factory=Lock)
 
 sessions: dict[str, Session] = {}
+SESSION_IDLE_TIMEOUT = timedelta(hours=2)
 
 class LoginRequest(BaseModel):
     api_key: str
@@ -89,7 +90,7 @@ def get_audio_suffix(content_type: str | None) -> str:
     return extensions.get(media_type, ".audio")
 
 
-def get_api_key_from_session(session_id: str | None) -> str:
+def get_api_key_from_session(session_id: str | None, *, touch: bool = False) -> str:
     if session_id is None:
         raise HTTPException(status_code=401, detail="Not authenticated.")
     session = sessions.get(session_id)
@@ -97,17 +98,25 @@ def get_api_key_from_session(session_id: str | None) -> str:
     if session is None:
         raise HTTPException(status_code=401, detail="Session expired.")
 
-    if (session.expires_at < datetime.now(timezone.utc)):
+    now = datetime.now(timezone.utc)
+    if session.expires_at <= now:
         sessions.pop(session_id, None)
         raise HTTPException(status_code=401, detail="Session expired.")
 
+    if touch:
+        session.expires_at = now + SESSION_IDLE_TIMEOUT
     return session.api_key
 
-def current_api_key(voice_elbus_session: str | None = Cookie(default=None)) -> str:
-    return get_api_key_from_session(voice_elbus_session)
+def current_api_key(response: Response,
+                    voice_elbus_session: str | None = Cookie(default=None)) -> str:
+    api_key = get_api_key_from_session(voice_elbus_session, touch=True)
+    response.headers["X-Session-Expires-At"] = sessions[voice_elbus_session].expires_at.isoformat()
+    response.headers["X-Session-Server-Time"] = datetime.now(timezone.utc).isoformat()
+    return api_key
 
-def current_session(voice_elbus_session: str | None = Cookie(default=None)) -> Session:
-    get_api_key_from_session(voice_elbus_session)
+def current_session(response: Response,
+                    voice_elbus_session: str | None = Cookie(default=None)) -> Session:
+    current_api_key(response, voice_elbus_session)
     return sessions[voice_elbus_session]
 
 
@@ -253,7 +262,7 @@ def create_app():
             raise HTTPException(status_code=401, detail=f"Invalid {INSTANCE_NAME} API key.") # error code: not authorized
 
         session_id = secrets.token_urlsafe(32)
-        sessions[session_id] = Session(api_key=api_key, expires_at=(datetime.now(timezone.utc) + timedelta(hours=2)))
+        sessions[session_id] = Session(api_key=api_key, expires_at=datetime.now(timezone.utc) + SESSION_IDLE_TIMEOUT)
 
         response.set_cookie(
             key="voice_elbus_session",
@@ -264,7 +273,9 @@ def create_app():
         )
 
         return {
-            "ok": True
+            "ok": True,
+            "expires_at": sessions[session_id].expires_at.isoformat(),
+            "server_time": datetime.now(timezone.utc).isoformat(),
         }
 
 
@@ -279,13 +290,18 @@ def create_app():
 
 
     @app.get("/auth/status")
-    def auth_status(voice_elbus_session: str | None = Cookie(default=None)):
+    def auth_status(response: Response,
+                    voice_elbus_session: str | None = Cookie(default=None)):
+        response.headers["Cache-Control"] = "no-store"
         try:
             get_api_key_from_session(voice_elbus_session)
         except HTTPException as exc:
             return {"authenticated": False, "reason": exc.detail}
 
-        return {"authenticated": True}
+        # Checking the countdown must not count as user activity.
+        return {"authenticated": True,
+                "expires_at": sessions[voice_elbus_session].expires_at.isoformat(),
+                "server_time": datetime.now(timezone.utc).isoformat()}
 
 
     # web operation for checkong on FastAPI

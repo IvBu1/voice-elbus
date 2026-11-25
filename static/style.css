@@ -382,3 +382,28 @@ audio {
     color: inherit;
 }
 
+
+.session-controls {
+    flex: 0 0 auto;
+    text-align: right;
+}
+
+.app-header .session-countdown {
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.app-header .session-countdown[data-state="warning"] {
+    color: #754c00;
+    font-weight: 600;
+}
+
+@media (max-width: 480px) {
+    .app-header {
+        flex-wrap: wrap;
+    }
+    .session-controls {
+        margin-left: auto;
+    }
+}

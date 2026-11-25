@@ -25,6 +25,7 @@ const continueWithoutAudioButton = document.getElementById("continueWithoutAudio
 const apiKeyInput = document.getElementById("apiKey");
 const loginButton = document.getElementById("loginButton");
 const logoutButton = document.getElementById("logoutButton");
+const sessionCountdown = document.getElementById("sessionCountdown");
 const loginStatus = document.getElementById("loginStatus");
 const loginSection = document.getElementById("loginSection");
 const workflow = document.getElementById("workflow");
@@ -43,6 +44,10 @@ let isTranscribing = false;
 let isSending = false;
 let pendingSubmission = null;
 let isLoadingExperiments = false;
+let sessionDeadline = null;
+let sessionGeneration = 0;
+let sessionStatusPending = false;
+let lastSessionCheck = 0;
 
 function updateNoteControls(){
     const busy = isRecording || isTranscribing || isSending;
@@ -53,17 +58,28 @@ function updateNoteControls(){
     attachAudio.disabled = isActionDisabled || latestAudioBlob === null;
     experimentIdInput.disabled = isActionDisabled || isLoadingExperiments || experimentIdInput.options.length <= 1;
     refreshExperimentsButton.disabled = isActionDisabled || isLoadingExperiments;
-    if(!pendingSubmission){
+    let submissionExpired = false;
+    if(pendingSubmission !== null && pendingSubmission.sessionExpired){
+        submissionExpired = true;
+    }
+    if(submissionExpired){
+        sendButton.textContent = "Check previous submission in " + instanceName;
+    } else if(!pendingSubmission){
         sendButton.textContent = "Add voice note";
     } else if(pendingSubmission.transcriptSaved){
         sendButton.textContent = "Retry audio upload";
     } else {
         sendButton.textContent = "Retry sending voice note";
     }
-    if(pendingSubmission !== null && pendingSubmission.transcriptSaved && !busy){
+    if(pendingSubmission !== null && (pendingSubmission.transcriptSaved || submissionExpired) && !busy){
         continueWithoutAudioButton.hidden = false;
     } else {
         continueWithoutAudioButton.hidden = true;
+    }
+    if(submissionExpired){
+        continueWithoutAudioButton.textContent = "Discard local note";
+    } else {
+        continueWithoutAudioButton.textContent = "Continue without audio";
     }
     continueWithoutAudioButton.disabled = !isAuthenticated || busy;
     updateSendButtonState();
@@ -81,6 +97,7 @@ function updateSendButtonState(){
     const hasExperiment = verifiedExperimentId !== null;
     const hasTranscript = transcript.value.trim() !== "";
     sendButton.disabled = !isAuthenticated || isRecording || isTranscribing || isSending
+        || (pendingSubmission !== null && pendingSubmission.sessionExpired === true)
         || (!pendingSubmission && !(hasExperiment && hasTranscript));
 }
 
@@ -99,6 +116,9 @@ function setAuthenticated(authenticated){
         experimentIdInput.disabled = experimentIdInput.options.length <= 1;
         refreshExperimentsButton.disabled = false;
     } else {
+        sessionGeneration++;
+        sessionDeadline = null;
+        sessionCountdown.hidden = true;
         experimentsRequestVersion++;
         isLoadingExperiments = false;
         experimentIdInput.replaceChildren(new Option("Connect to load experiments", ""));
@@ -160,24 +180,29 @@ function resetWorkflow(){
 
 // +++++++ authentication +++++++
 async function authenticatedFetch(url, options={}){
+    const generation = sessionGeneration;
+    const started = performance.now();
     const response = await fetch(url, {
         ...options,
         // the browser sends our session cookie
         credentials: "same-origin"
     });
 
-    if(response.status === 401){
-        resetWorkflow();
-        setAuthenticated(false);
-        const message = "Your " + instanceName + " session has expired. Please connect again.";
-        setMessage(loginStatus, message, "error");
-        throw new Error(message);
+    if(generation === sessionGeneration){
+        if(response.status === 401){
+            expireSession();
+            throw new Error("Your session has expired. Please connect again.");
+        }
+        if(isAuthenticated){
+            setSessionDeadline(response.headers.get("X-Session-Expires-At"),
+                               response.headers.get("X-Session-Server-Time"), started);
+        }
     }
-
     return response;
 }
 
 async function checkAuthentication(){
+    const started = performance.now();
     try {
         const response = await fetch("auth/status", {
             credentials: "same-origin"
@@ -190,6 +215,7 @@ async function checkAuthentication(){
         setAuthenticated(result.authenticated);
 
         if(result.authenticated){
+            setSessionDeadline(result.expires_at, result.server_time, started);
             setMessage(status, "Ready.", "neutral");
             await loadExperiments();
         }
@@ -212,6 +238,7 @@ loginButton.addEventListener("click", async function(){
             return;
         }
 
+        const started = performance.now();
         loginButton.disabled = true;
         apiKeyInput.disabled = true;
         setMessage(loginStatus, "Connecting to " + instanceName + "...", "neutral");
@@ -231,8 +258,13 @@ loginButton.addEventListener("click", async function(){
 
             // remove the API key from the input as soon as authentication succeeds
             apiKeyInput.value = "";
+            const result = await response.json();
             setAuthenticated(true);
+            setSessionDeadline(result.expires_at, result.server_time, started);
             setMessage(status, "Ready.", "neutral");
+            if(pendingSubmission !== null && pendingSubmission.sessionExpired){
+                setMessage(status, "Your previous submission may already be saved. Check " + instanceName + " before discarding the local note and sending another copy.", "warning");
+            }
             await loadExperiments();
         } catch(error){
             setAuthenticated(false);
@@ -271,6 +303,85 @@ logoutButton.addEventListener("click", async function(){
         }
     }
 );
+function setSessionDeadline(expiresAt, serverTime, started){
+    const lifetime = Date.parse(expiresAt) - Date.parse(serverTime);
+    if(!Number.isFinite(lifetime))
+        return;
+    // Use elapsed time rather than the laptop clock, which may differ from the server.
+    const deadline = started + lifetime;
+    if(sessionDeadline === null || deadline > sessionDeadline){
+        sessionDeadline = deadline;
+    }
+    sessionCountdown.hidden = false;
+    renderSessionCountdown();
+}
+
+function renderSessionCountdown(){
+    if(!isAuthenticated || sessionDeadline === null){
+        sessionCountdown.hidden = true;
+        return;
+    }
+    const seconds = Math.max(0, Math.ceil((sessionDeadline - performance.now()) / 1000));
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainder = seconds % 60;
+    sessionCountdown.textContent = "Session: " + String(hours).padStart(2, "0") + ":"
+        + String(minutes).padStart(2, "0") + ":" + String(remainder).padStart(2, "0");
+    if(seconds <= 300){
+        sessionCountdown.dataset.state = "warning";
+    } else {
+        sessionCountdown.dataset.state = "neutral";
+    }
+    if(seconds === 0 && performance.now() - lastSessionCheck >= 30000)
+        refreshSessionStatus();
+}
+
+function expireSession(){
+    if(pendingSubmission !== null)
+        pendingSubmission.sessionExpired = true;
+    // Ignore late upload/transcription responses after reconnecting.
+    if(!mediaRecorder || mediaRecorder.state !== "recording"){
+        noteVersion++;
+        isRecording = false;
+        isTranscribing = false;
+        isSending = false;
+    }
+    // Keep the draft and recorded audio; stop the microphone if it is still running.
+    setAuthenticated(false);
+    if(latestAudioBlob !== null)
+        transcribeButton.hidden = false;
+    if(mediaRecorder && mediaRecorder.state === "recording")
+        mediaRecorder.stop();
+    const message = "Your " + instanceName + " session expired after two hours of inactivity. Please reconnect. Your current note is kept on this page.";
+    setMessage(loginStatus, message, "error");
+}
+
+async function refreshSessionStatus(){
+    if(!isAuthenticated || sessionStatusPending)
+        return;
+    const generation = sessionGeneration;
+    const started = performance.now();
+    lastSessionCheck = started;
+    sessionStatusPending = true;
+    try {
+        const response = await fetch("auth/status", {credentials: "same-origin", cache: "no-store"});
+        if(!response.ok)
+            return;
+        const result = await response.json();
+        if(generation !== sessionGeneration || !isAuthenticated)
+            return;
+        if(result.authenticated){
+            setSessionDeadline(result.expires_at, result.server_time, started);
+        } else {
+            expireSession();
+        }
+    } catch{
+        // A temporary network failure does not establish that the session expired.
+    } finally {
+        sessionStatusPending = false;
+    }
+}
+
 // ------- authentication -------
 
 
@@ -332,7 +443,7 @@ recordButton.addEventListener("click", async function (){
         recorder.addEventListener("dataavailable", event => chunks.push(event.data));
         recorder.addEventListener("stop", function (){
             stream.getTracks().forEach(track => track.stop());
-            if(!isAuthenticated || version !== noteVersion)
+            if(version !== noteVersion)
                 return;
             audioStream = null;
             isRecording = false;
@@ -342,7 +453,12 @@ recordButton.addEventListener("click", async function (){
             audioPlayer.src = latestAudioUrl;
             audioPlayer.hidden = false;
             audioSize.textContent = "(" + (latestAudioBlob.size / 1_000_000).toFixed(2) + " MB)";
-            transcribeRecording();
+            if(isAuthenticated){
+                transcribeRecording();
+            } else {
+                transcribeButton.hidden = false;
+                updateNoteControls();
+            }
         });
 
         recorder.start();
@@ -441,6 +557,10 @@ async function getErrorMessage(response, fallbackMessage){
 
 // +++++++ ELBUS submission +++++++
 async function sendToElbus(){
+    if(pendingSubmission !== null && pendingSubmission.sessionExpired){
+        setMessage(status, "Check the previous submission in " + instanceName + " before sending again.", "warning");
+        return;
+    }
     if(!isAuthenticated || isRecording || isTranscribing || isSending)
         return;
     if(!pendingSubmission){
@@ -534,7 +654,15 @@ async function sendToElbus(){
 
 sendButton.addEventListener("click", sendToElbus);
 continueWithoutAudioButton.addEventListener("click", function(){
-    if(!isAuthenticated || isSending || pendingSubmission === null || !pendingSubmission.transcriptSaved)
+    if(!isAuthenticated || isSending || pendingSubmission === null)
+        return;
+    if(pendingSubmission.sessionExpired){
+        resetFormAfterSend();
+        updateNoteControls();
+        setMessage(status, "Local note discarded. Ready for a new recording.", "neutral");
+        return;
+    }
+    if(!pendingSubmission.transcriptSaved)
         return;
     resetFormAfterSend();
     updateNoteControls();
@@ -623,3 +751,13 @@ experimentIdInput.addEventListener("change", selectExperiment);
 // initial page state
 setAuthenticated(false);
 checkAuthentication();
+
+// Status checks never extend the backend session. They also synchronize other tabs.
+setInterval(renderSessionCountdown, 1000);
+setInterval(refreshSessionStatus, 30000);
+document.addEventListener("visibilitychange", function(){
+    if(!document.hidden){
+        renderSessionCountdown();
+        refreshSessionStatus();
+    }
+});

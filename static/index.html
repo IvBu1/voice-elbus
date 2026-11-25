@@ -23,9 +23,12 @@ SPDX-License-Identifier: MIT
                 <h1>{{INSTANCE_NAME}} Voice</h1>
                 <p>Record a laboratory note, review the transcription, and add it to {{INSTANCE_NAME}}.</p>
             </div>
-            <button id="logoutButton" class="button danger logout-button" hidden>
-                Disconnect
-            </button>
+            <div class="session-controls">
+                <p id="sessionCountdown" class="session-countdown" title="Time until logout without authenticated server activity. Recording and typing do not extend it." hidden></p>
+                <button id="logoutButton" class="button danger logout-button" hidden>
+                    Disconnect
+                </button>
+            </div>
         </header>
 
         <section class="card login-card" id="loginSection">
@@ -95,7 +98,7 @@ SPDX-License-Identifier: MIT
         </footer>
     </main>
 
-    <script src="static/app.js?v=instance-name-1"></script>
+    <script src="static/app.js?v=idle-session-1"></script>
 
 </body>
 
