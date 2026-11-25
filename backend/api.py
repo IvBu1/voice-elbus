@@ -29,6 +29,7 @@ from backend.transcription import transcribe_audio
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").strip().lower() == "true"
+OPERATOR_NAME = os.environ.get("APP_OPERATOR_NAME", "").strip()
 APP_VERSION = os.environ.get("APP_VERSION", "development").strip() or "development"
 APP_REVISION = os.environ.get("APP_REVISION", "").strip()
 APP_REPOSITORY_URL = os.environ.get("APP_REPOSITORY_URL", "").strip().rstrip("/")
@@ -135,10 +136,11 @@ def create_app():
     def index():
         html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
         values = {"INSTANCE_NAME": escape(INSTANCE_NAME, quote=True),
+                  "OPERATOR_NAME": escape(OPERATOR_NAME, quote=True),
                   "VERSION_INFO": render_version_info(),
                   "MAX_ATTACHMENT_MB": str(MAX_ATTACHMENT_MB),
                   "MAX_ATTACHMENT_BYTES": str(MAX_ATTACHMENT_BYTES)}
-        html = re.sub(r"\{\{(INSTANCE_NAME|VERSION_INFO|MAX_ATTACHMENT_MB|MAX_ATTACHMENT_BYTES)\}\}",
+        html = re.sub(r"\{\{(INSTANCE_NAME|OPERATOR_NAME|VERSION_INFO|MAX_ATTACHMENT_MB|MAX_ATTACHMENT_BYTES)\}\}",
                       lambda match: values[match.group(1)], html)
         return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 

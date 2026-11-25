@@ -382,6 +382,31 @@ audio {
     color: inherit;
 }
 
+.funding {
+    margin: 0;
+    padding-top: 16px;
+    border-top: 1px solid #dfe3e8;
+    text-align: left;
+    font-size: 0.75rem;
+    line-height: 1.6;
+}
+
+.footer-meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 20px;
+    margin-top: 20px;
+}
+
+.footer-meta p {
+    margin: 0;
+}
+
+.footer-meta p:last-child {
+    margin-left: auto;
+}
+
 
 .session-controls {
     flex: 0 0 auto;
