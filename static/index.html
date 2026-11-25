@@ -16,7 +16,7 @@ SPDX-License-Identifier: MIT
 </head>
 
 
-<body data-instance-name="{{INSTANCE_NAME}}">
+<body data-instance-name="{{INSTANCE_NAME}}" data-max-attachment-bytes="{{MAX_ATTACHMENT_BYTES}}">
     <main class="app">
         <header class="app-header">
             <div>
@@ -86,7 +86,7 @@ SPDX-License-Identifier: MIT
                     <input id="attachAudio" type="checkbox" checked disabled>
                     Attach original audio <span id="audioSize"></span>
                 </label>
-                <p>The audio is uploaded to {{INSTANCE_NAME}} with the note. Maximum attachment size: 50 MB.</p>
+                <p>The audio is uploaded to {{INSTANCE_NAME}} with the note. Maximum recording and attachment size: {{MAX_ATTACHMENT_MB}} MB.</p>
                 <p id="sendDestination" class="experiment-info send-destination" aria-live="polite">Select an experiment before sending.</p>
                 <button id="sendButton" class="button success" aria-describedby="sendDestination" disabled>Add voice note</button>
                 <button id="continueWithoutAudioButton" class="button secondary" hidden>Continue without audio</button>
@@ -98,7 +98,7 @@ SPDX-License-Identifier: MIT
         </footer>
     </main>
 
-    <script src="static/app.js?v=idle-session-1"></script>
+    <script src="static/app.js"></script>
 
 </body>
 

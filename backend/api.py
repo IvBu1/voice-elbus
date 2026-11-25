@@ -4,7 +4,6 @@
 import os
 import re
 import secrets
-import shutil
 import tempfile
 import traceback
 from datetime import datetime, timedelta, timezone
@@ -72,7 +71,13 @@ class VoiceNoteRequest(AppendRequest):
     submission_id: UUID
     audio_type: str | None = None
 
-MAX_ATTACHMENT_BYTES = 25_000_000
+try:
+    MAX_ATTACHMENT_MB = int(os.environ["MAX_ATTACHMENT_MB"])
+except ValueError as exc:
+    raise ValueError("MAX_ATTACHMENT_MB must be a positive integer.") from exc
+if MAX_ATTACHMENT_MB <= 0:
+    raise ValueError("MAX_ATTACHMENT_MB must be a positive integer.")
+MAX_ATTACHMENT_BYTES = MAX_ATTACHMENT_MB * 1_000_000
 
 def get_audio_suffix(content_type: str | None) -> str:
     if not content_type:
@@ -130,8 +135,10 @@ def create_app():
     def index():
         html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
         values = {"INSTANCE_NAME": escape(INSTANCE_NAME, quote=True),
-                  "VERSION_INFO": render_version_info()}
-        html = re.sub(r"\{\{(INSTANCE_NAME|VERSION_INFO)\}\}",
+                  "VERSION_INFO": render_version_info(),
+                  "MAX_ATTACHMENT_MB": str(MAX_ATTACHMENT_MB),
+                  "MAX_ATTACHMENT_BYTES": str(MAX_ATTACHMENT_BYTES)}
+        html = re.sub(r"\{\{(INSTANCE_NAME|VERSION_INFO|MAX_ATTACHMENT_MB|MAX_ATTACHMENT_BYTES)\}\}",
                       lambda match: values[match.group(1)], html)
         return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
@@ -144,11 +151,21 @@ def create_app():
         tmp_path = None
 
         try:
+            if file.size is not None and file.size > MAX_ATTACHMENT_BYTES:
+                raise HTTPException(status_code=413, detail=f"Recordings must be no larger than {MAX_ATTACHMENT_MB} MB.")
             with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp_file:
-                shutil.copyfileobj(file.file, tmp_file)
                 tmp_path = Path(tmp_file.name)
+                total_bytes = 0
+                while chunk := file.file.read(1024 * 1024):
+                    total_bytes += len(chunk)
+                    if total_bytes > MAX_ATTACHMENT_BYTES:
+                        raise HTTPException(status_code=413, detail=f"Recordings must be no larger than {MAX_ATTACHMENT_MB} MB.")
+                    tmp_file.write(chunk)
+                tmp_file.flush()
                 transcript = transcribe_audio(tmp_path)
                 return {"text": transcript}
+        except HTTPException:
+            raise
         except Exception as exc:
             print("\n--- TRANSCRIPTION ERROR ---")
             traceback.print_exc()
@@ -209,7 +226,7 @@ def create_app():
         audio = bytearray()
         async for chunk in request.stream():
             if len(audio) + len(chunk) > MAX_ATTACHMENT_BYTES:
-                raise HTTPException(status_code=413, detail="Audio attachments must be no larger than 25 MB.")
+                raise HTTPException(status_code=413, detail=f"Audio attachments must be no larger than {MAX_ATTACHMENT_MB} MB.")
             audio.extend(chunk)
         if not audio:
             raise HTTPException(status_code=400, detail="The audio recording is empty.")

@@ -4,6 +4,8 @@
  */
 
 const instanceName = document.body.dataset.instanceName;
+const maxAttachmentBytes = Number(document.body.dataset.maxAttachmentBytes);
+const maxAttachmentMB = maxAttachmentBytes / 1_000_000;
 
 const recordButton = document.getElementById("recordButton");
 const stopButton = document.getElementById("stopButton");
@@ -493,6 +495,12 @@ async function transcribeRecording(){
     if(!isAuthenticated || isRecording || isTranscribing || isSending || pendingSubmission || latestAudioBlob === null)
         return;
 
+    if(latestAudioBlob.size > maxAttachmentBytes){
+        setMessage(status, "The recording exceeds " + maxAttachmentMB + " MB. Please record a shorter note.", "error");
+        transcribeButton.hidden = true;
+        updateNoteControls();
+        return;
+    }
     const version = noteVersion;
     isTranscribing = true;
     transcribeButton.hidden = true;
@@ -574,8 +582,8 @@ async function sendToElbus(){
             return;
         }
         const includeAudio = attachAudio.checked && latestAudioBlob !== null;
-        if(includeAudio && latestAudioBlob.size > 50_000_000){
-            setMessage(status, "The audio exceeds 50 MB. Uncheck Attach original audio to send only the transcript.", "error");
+        if(includeAudio && latestAudioBlob.size > maxAttachmentBytes){
+            setMessage(status, "The audio exceeds " + maxAttachmentMB + " MB. Uncheck Attach original audio to send only the transcript.", "error");
             return;
         }
         let audioType;
