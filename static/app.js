@@ -6,6 +6,23 @@
 const instanceName = document.body.dataset.instanceName;
 const maxAttachmentBytes = Number(document.body.dataset.maxAttachmentBytes);
 const maxAttachmentMB = maxAttachmentBytes / 1_000_000;
+const sessionIdleTimeoutSeconds = Number(document.body.dataset.sessionIdleTimeoutSeconds);
+
+function formatSessionIdleTimeout(){
+    let value = sessionIdleTimeoutSeconds;
+    let unit = "second";
+    if(value % 3600 === 0){
+        value /= 3600;
+        unit = "hour";
+    } else if(value % 60 === 0){
+        value /= 60;
+        unit = "minute";
+    }
+    if(value !== 1){
+        unit += "s";
+    }
+    return value + " " + unit;
+}
 
 const recordButton = document.getElementById("recordButton");
 const stopButton = document.getElementById("stopButton");
@@ -354,7 +371,7 @@ function expireSession(){
         transcribeButton.hidden = false;
     if(mediaRecorder && mediaRecorder.state === "recording")
         mediaRecorder.stop();
-    const message = "Your " + instanceName + " session expired after two hours of inactivity. Please reconnect. Your current note is kept on this page.";
+    const message = "Your " + instanceName + " session expired after " + formatSessionIdleTimeout() + " of inactivity. Please reconnect. Your current note is kept on this page.";
     setMessage(loginStatus, message, "error");
 }
 

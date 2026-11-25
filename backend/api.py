@@ -138,9 +138,10 @@ def create_app():
         values = {"INSTANCE_NAME": escape(INSTANCE_NAME, quote=True),
                   "OPERATOR_NAME": escape(OPERATOR_NAME, quote=True),
                   "VERSION_INFO": render_version_info(),
+                  "SESSION_IDLE_TIMEOUT_SECONDS": str(int(SESSION_IDLE_TIMEOUT.total_seconds())),
                   "MAX_ATTACHMENT_MB": str(MAX_ATTACHMENT_MB),
                   "MAX_ATTACHMENT_BYTES": str(MAX_ATTACHMENT_BYTES)}
-        html = re.sub(r"\{\{(INSTANCE_NAME|OPERATOR_NAME|VERSION_INFO|MAX_ATTACHMENT_MB|MAX_ATTACHMENT_BYTES)\}\}",
+        html = re.sub(r"\{\{(INSTANCE_NAME|OPERATOR_NAME|VERSION_INFO|SESSION_IDLE_TIMEOUT_SECONDS|MAX_ATTACHMENT_MB|MAX_ATTACHMENT_BYTES)\}\}",
                       lambda match: values[match.group(1)], html)
         return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
