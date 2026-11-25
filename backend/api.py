@@ -29,7 +29,9 @@ from backend.transcription import transcribe_audio
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").strip().lower() == "true"
-OPERATOR_NAME = os.environ.get("APP_OPERATOR_NAME", "").strip()
+OPERATOR_NAME = os.environ["APP_OPERATOR_NAME"].strip()
+if not OPERATOR_NAME:
+    raise ValueError("APP_OPERATOR_NAME must not be empty.")
 APP_VERSION = os.environ.get("APP_VERSION", "development").strip() or "development"
 APP_REVISION = os.environ.get("APP_REVISION", "").strip()
 APP_REPOSITORY_URL = os.environ.get("APP_REPOSITORY_URL", "").strip().rstrip("/")
