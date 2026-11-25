@@ -16,6 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN python3 -c "import whisper; whisper.load_model('base')"
 
 COPY main.py .
+COPY LICENSE .
 COPY backend ./backend
 COPY static ./static
 
