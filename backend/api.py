@@ -58,7 +58,7 @@ class Session:
     notes_lock: Lock = field(default_factory=Lock)
 
 sessions: dict[str, Session] = {}
-SESSION_IDLE_TIMEOUT = timedelta(hours=2)
+SESSION_IDLE_TIMEOUT = timedelta(hours=4)
 
 class LoginRequest(BaseModel):
     api_key: str
