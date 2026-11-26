@@ -1,0 +1,16 @@
+services:
+  voice-elbus:
+    image: ghcr.io/ivbu1/voice-elbus:${IMAGE_TAG}
+
+    restart: unless-stopped
+
+    ports:
+      - "127.0.0.1:8000:8000"
+
+    environment:
+      HOST_IP: "0.0.0.0"
+      ELABFTW_BASE_URL: ${ELABFTW_BASE_URL}
+      ELABFTW_INSTANCE_NAME: ${ELABFTW_INSTANCE_NAME}  
+      COOKIE_SECURE: "true"
+      MAX_ATTACHMENT_MB: ${MAX_ATTACHMENT_MB}
+      APP_OPERATOR_NAME: ${APP_OPERATOR_NAME}

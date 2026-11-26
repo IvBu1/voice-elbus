@@ -1,0 +1,55 @@
+# Replace voice.example.org throughout with your service hostname.
+# The certificates and upload-limit snippet must exist before enabling this configuration.
+server {
+    if ($host = voice.example.org) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+
+ 
+    listen 80; 
+    listen [::]:80; 
+    server_name voice.example.org; 
+    
+    access_log /var/log/nginx/voice-elbus-access.log combined;
+    error_log /var/log/nginx/voice-elbus-error.log warn;
+
+    location ^~ /.well-known/acme-challenge/ { 
+        root /var/www/certbot; 
+        default_type "text/plain"; 
+        try_files $uri =404; 
+    }
+	
+    location / { 
+        return 301 https://$host$request_uri;
+    }
+
+
+}
+
+
+server {
+    listen 443 ssl; 
+    listen [::]:443 ssl; 
+    server_name voice.example.org;
+    ssl_certificate /etc/letsencrypt/live/voice.example.org/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/voice.example.org/privkey.pem; # managed by Certbot
+
+    access_log /var/log/nginx/voice-elbus-access.log combined;
+    error_log /var/log/nginx/voice-elbus-error.log warn;
+
+    # set data size upload limit
+    include /etc/nginx/snippets/voice-elbus-upload-limit.conf;
+	
+    location / { 
+        proxy_pass http://127.0.0.1:8000; 
+        proxy_http_version 1.1; 
+        proxy_set_header Host $host; 
+        proxy_set_header X-Real-IP $remote_addr; 
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; 
+        proxy_set_header X-Forwarded-Proto $scheme; 
+        proxy_read_timeout 300s; 
+        proxy_send_timeout 300s; 
+        proxy_request_buffering off; 
+    } 
+
+}
